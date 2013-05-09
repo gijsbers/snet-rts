@@ -1,12 +1,7 @@
 #ifndef _TRACE_H
 #define _TRACE_H
 
-/* Choose whether to enable or disable function call tracing */
-#if !defined(ENABLE_TRACE) && !defined(NTRACE)
-#   define ENABLE_TRACE    1
-#endif
-
-/* Only trace when ENABLE_TRACE is true */
+/* Only trace when ENABLE_TRACE is defined externally in the Makefile */
 #if ENABLE_TRACE
     extern void (*SNetTraceFunc)(const char *func);
 #   define trace(x)     (*SNetTraceFunc)(x)
