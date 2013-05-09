@@ -8,6 +8,8 @@ AM_INIT_AUTOMAKE([1.11 tar-ustar no-define foreign dist-bzip2 subdir-objects
                   parallel-tests color-tests silent-rules])
 AM_SILENT_RULES([yes])
 
+dnl Ensure that API extensions are available. 
+AC_USE_SYSTEM_EXTENSIONS
 
 AC_ARG_ENABLE([dist-scc], [AS_HELP_STRING([--enable-dist-scc],
     [Enable the custom distribution layer for the SCC (default is disabled)])],
@@ -42,8 +44,6 @@ AM_CONDITIONAL([ENABLE_DIST_MPI], [test $use_mpi = yes])
 
 dnl ensure that either mpicc or cc detected above are configured in c99 mode
 AC_PROG_CC_C99 
-dnl and API extensions are available. 
-AC_USE_SYSTEM_EXTENSIONS
 
 AC_PROG_CPP
 
@@ -61,7 +61,14 @@ AX_APPEND_FLAG(["$PTHREAD_LIBS"], LIBS)
 #CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
 
 
-AC_CHECK_FUNCS([pthread_setaffinity_np])
+AC_ARG_ENABLE([setaffinity], [AS_HELP_STRING([--disable-setaffinity],
+    [Disable the use of pthread_setaffinity_np to limit the number
+     of processor cores when the -w option is given
+     to the runtime system (default is enabled).])],
+    [disable_setaffinity=yes], [disable_setaffinity=no])
+if test x$disable_setaffinity != xyes; then
+  AC_CHECK_FUNCS([pthread_setaffinity_np])
+fi
 AC_CHECK_FUNCS([pthread_yield_np])
 AC_CHECK_FUNCS([pthread_yield])
 
