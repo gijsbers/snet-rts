@@ -20,7 +20,7 @@
 #include "record.h"
 
 // to activate/deactivate user event logging (message trace)
-#define USE_USER_EVENT_LOGGING
+#undef USE_USER_EVENT_LOGGING
 
 
 typedef union moninfo_types snet_moninfo_types_t;
