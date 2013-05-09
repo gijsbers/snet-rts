@@ -15,7 +15,7 @@
 #include "moninfo.h"
 #include "threading.h"
 
-
+#if USE_USER_EVENT_LOGGING
 
 struct mlist_node_t {
   struct mlist_node_t *next;
@@ -280,4 +280,10 @@ static void *MonitorThread(void *arg)
   return NULL;
 }
 
+#else
+
+void SNetThreadingMonitoringCleanup(void)
+{
+}
+#endif
 
