@@ -135,6 +135,12 @@ snet_stream_t *SNetDripBack(
     snet_expr_list_t    *guards,
     snet_startup_fun_t   box_a);
 
+/* xdump.c */
+
+
+/* Write the static entity graph to file. */
+void SNetDumpNodeGraph(snet_stream_t* input, snet_stream_t* output);
+
 /* xfeedback.c */
 
 
@@ -635,6 +641,9 @@ snet_stream_desc_t *SNetStreamOpen(
     snet_stream_t *stream,
     snet_stream_desc_t *prev);
 
+/* Dummy read function. */
+void *SNetStreamRead(snet_stream_desc_t *sd);
+
 /* xsync.c */
 
 
@@ -680,6 +689,9 @@ bool SNetDebug(void);
 
 /* Whether to use a deterministic feedback */
 bool SNetFeedbackDeterministic(void);
+
+/* Whether to dump the entity graph to file */
+bool SNetOptDumpGraph(void);
 
 /* Whether to use optimized sync-star */
 bool SNetZipperEnabled(void);

@@ -290,6 +290,7 @@ snet_stream_desc_t *SNetStreamOpen(
   return desc;
 }
 
+/* Dummy read function. */
 void *SNetStreamRead(snet_stream_desc_t *sd)
 {
   /* impossible */

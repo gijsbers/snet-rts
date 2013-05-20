@@ -167,6 +167,7 @@ libfrontrt_la_SOURCES = \
 	src/runtime/front/xcoll.c \
 	src/runtime/front/xdet.c \
 	src/runtime/front/xdripback.c \
+	src/runtime/front/xdump.c \
 	src/runtime/front/xfeedback.c \
 	src/runtime/front/xfifo.c \
 	src/runtime/front/xfifo.h \

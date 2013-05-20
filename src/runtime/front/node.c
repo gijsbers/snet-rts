@@ -82,6 +82,11 @@ void SNetNodeRun(snet_stream_t *input, snet_info_t *info, snet_stream_t *output)
   assert(output->from);
   assert(NODE_TYPE(output->dest) == NODE_output);
 
+  /* Write entity graph to file? */
+  if (SNetOptDumpGraph()) {
+    SNetDumpNodeGraph(input, output);
+  }
+
   /* Allocate array of worker structures. */
   num_workers = SNetThreadingWorkers();
   snet_worker_count = num_workers;
@@ -142,11 +147,8 @@ const char* SNetNodeName(node_t *node)
   NODE(NODE_collector)
   NODE(NODE_input)
   NODE(NODE_output)
-  NODE(NODE_detenter)
-  NODE(NODE_detleave)
   NODE(NODE_zipper)
   NODE(NODE_identity)
-  NODE(NODE_input)
   NODE(NODE_garbage)
   NODE(NODE_observer)
   NODE(NODE_observer2)

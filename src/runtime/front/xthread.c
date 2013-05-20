@@ -21,6 +21,7 @@ static bool             opt_verbose;
 static bool             opt_debug;
 static bool             opt_zipper;
 static bool             opt_feedback_deterministic;
+static bool             opt_dump_graph;
 static size_t           opt_stack_size;
 static const char      *opt_concurrency;
 static bool             opt_input_throttle;
@@ -70,6 +71,12 @@ bool SNetDebug(void)
 bool SNetFeedbackDeterministic(void)
 {
   return opt_feedback_deterministic;
+}
+
+/* Whether to dump the entity graph to file */
+bool SNetOptDumpGraph(void)
+{
+  return opt_dump_graph;
 }
 
 /* Whether to use optimized sync-star */
@@ -197,6 +204,9 @@ int SNetThreadingInit(int argc, char**argv)
     else if (EQ(argv[i], "-g")) {
       opt_garbage_collection = false;
     }
+    else if (EQ(argv[i], "-G")) {
+      opt_dump_graph = true;
+    }
     else if (EQ(argv[i], "-s") && ++i < argc) {
       if ((opt_stack_size = GetSize(argv[i])) < PTHREAD_STACK_MIN) {
         SNetUtilDebugFatal("[%s]: Invalid stack size %s (l.t. %d).",
@@ -250,10 +260,12 @@ int SNetThreadingInit(int argc, char**argv)
   }
 
   if (opt_verbose) {
-    printf("W=%d,GC=%s,Z=%s.\n",
+    printf("W=%d,GC=%s,Z=%s,FB=%s,DG=%s.\n",
            num_workers,
            opt_garbage_collection ? "true" : "false",
-           opt_zipper ? "true" : "false"
+           opt_zipper ? "true" : "false",
+           opt_feedback_deterministic ? "Det" : "NonDet",
+           opt_dump_graph ? "true" : "false"
            );
   }
 

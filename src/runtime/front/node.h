@@ -60,8 +60,6 @@ enum node_type {
   NODE_collector = 280,
   NODE_input     = 290,
   NODE_output    = 300,
-  NODE_detenter  = 310,
-  NODE_detleave  = 320,
   NODE_zipper    = 330,
   NODE_identity  = 340,
   NODE_garbage   = 350,
