@@ -63,10 +63,9 @@ AX_APPEND_FLAG(["$PTHREAD_LIBS"], LIBS)
 
 AC_ARG_ENABLE([setaffinity], [AS_HELP_STRING([--disable-setaffinity],
     [Disable the use of pthread_setaffinity_np to limit the number
-     of processor cores when the -w option is given
-     to the runtime system (default is enabled).])],
-    [disable_setaffinity=yes], [disable_setaffinity=no])
-if test x$disable_setaffinity != xyes; then
+     of processor cores when the -w option is given to the runtime
+     system (default is enabled).])])
+if test x$enable_setaffinity != xno; then
   AC_CHECK_FUNCS([pthread_setaffinity_np])
 fi
 AC_CHECK_FUNCS([pthread_yield_np])
