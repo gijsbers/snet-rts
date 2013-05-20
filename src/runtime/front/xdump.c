@@ -129,7 +129,7 @@ static void SNetDumpSubnet(
           SNetFifoPut(&fifo2, NODE_SPEC(node, parallel)->outputs[i]);
         }
         fprintf(fp, "subgraph cluster%td {\n", (ptrdiff_t) stream);
-        fprintf(fp, "color=blue;\n");
+        fprintf(fp, "color=green;\n");
         SNetDumpSubnet(fp, hash, &fifo2);
         fprintf(fp, "}\n");
         SNetFifoDone(&fifo2);
@@ -157,7 +157,7 @@ static void SNetDumpSubnet(
         SNetFifoPut(&fifo2, NODE_SPEC(node, split)->instance);
         SNetFifoPut(&fifo2, NODE_SPEC(node, split)->collector);
         fprintf(fp, "subgraph cluster%td {\n", (ptrdiff_t) stream);
-        fprintf(fp, "color=blue;\n");
+        fprintf(fp, "color=red;\n");
         SNetDumpSubnet(fp, hash, &fifo2);
         fprintf(fp, "}\n");
         SNetFifoDone(&fifo2);
@@ -169,7 +169,7 @@ static void SNetDumpSubnet(
           SNetFifoInit(&fifo2);
           SNetFifoPut(&fifo2, NODE_SPEC(node, feedback)->instance);
           fprintf(fp, "subgraph cluster%td {\n", (ptrdiff_t) stream);
-          fprintf(fp, "color=blue;\n");
+          fprintf(fp, "color=pink;\n");
           SNetDumpSubnet(fp, hash, &fifo2);
           fprintf(fp, "}\n");
           SNetFifoDone(&fifo2);
@@ -182,7 +182,7 @@ static void SNetDumpSubnet(
           SNetFifoInit(&fifo2);
           SNetFifoPut(&fifo2, NODE_SPEC(node, dripback)->instance);
           fprintf(fp, "subgraph cluster%td {\n", (ptrdiff_t) stream);
-          fprintf(fp, "color=blue;\n");
+          fprintf(fp, "color=pink;\n");
           SNetDumpSubnet(fp, hash, &fifo2);
           fprintf(fp, "}\n");
           SNetFifoDone(&fifo2);
@@ -242,6 +242,10 @@ void SNetDumpNodeGraph(snet_stream_t* input, snet_stream_t* output)
   SNetDumpAdd(hash, &fifo, input);
 
   fprintf(fp, "digraph snet_graph_dump {\n");
+  fprintf(fp, "rankdir=LR;\n");
+  fprintf(fp, "ranksep=0.1;\n");
+  fprintf(fp, "mindist=0.1;\n");
+  fprintf(fp, "nodesep=0.2;\n");
   SNetDumpSubnet(fp, hash, &fifo);
   fprintf(fp, "%td [shape=Mdiamond];\n", (ptrdiff_t) STREAM_FROM(input));
   fprintf(fp, "%td [shape=Msquare];\n", (ptrdiff_t) STREAM_DEST(output));
