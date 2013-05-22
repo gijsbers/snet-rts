@@ -47,6 +47,30 @@ snet_stream_t *SNetBox( snet_stream_t *input,
                         snet_exerealm_destroy_fun_t exerealm_destroy,
                         snet_int_list_list_t *output_variants);
 
+/* xchannel.c */
+
+
+/* Initialize a channel. */
+void SNetChannelInit(channel_t *chan);
+
+/* Create a new channel */
+channel_t *SNetChannelCreate(void);
+
+/* Cleanup a channel. */
+void SNetChannelDone(channel_t *chan);
+
+/* Delete a channel. */
+void SNetChannelDestroy(channel_t *chan);
+
+/* Append a new item at the tail of a channel. */
+void SNetChannelPut(channel_t *chan, void *item);
+
+/* Retrieve an item from the head of a channel. */
+void *SNetChannelGet(channel_t *chan);
+
+/* A fused send/recv if caller owns both sides. */
+void *SNetChannelPutGet(channel_t *chan, void *item);
+
 /* xcoll.c */
 
 

@@ -27,7 +27,8 @@ typedef struct channel          channel_t;
 
 /* A data node for a channel containing pointers to data.
  * 'first' indexes data and is the first item to read.
- * 'next' points to a subsequent channel node if not NULL.
+ * 'next' indexes data to point to a subsequent channel node,
+ * if not NULL.
  */
 struct chan_node {
   int            first, next;
@@ -37,13 +38,15 @@ struct chan_node {
 /* The reader side of a channel */
 struct chan_read {
   chan_node_t   *head;
-  int            index, next;
+  void         **get;
+  void         **next;
 };
 
 /* The writer side of a channel */
 struct chan_write {
   chan_node_t   *tail;
-  int            index, next;
+  void         **put;
+  void         **next;
 };
 
 /* A channel (size must equal CHAN_NODE_BYTES). */
