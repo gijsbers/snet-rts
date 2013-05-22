@@ -15,7 +15,7 @@
 #include "moninfo.h"
 #include "threading.h"
 
-#if USE_USER_EVENT_LOGGING
+#ifdef USE_USER_EVENT_LOGGING
 
 struct mlist_node_t {
   struct mlist_node_t *next;

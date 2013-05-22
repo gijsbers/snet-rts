@@ -73,7 +73,7 @@ int SNetThreadingInit(int argc, char **argv)
   int i, num_cores;
   pthread_t selftid;
 #endif
-#if USE_USER_EVENT_LOGGING
+#ifdef USE_USER_EVENT_LOGGING
   char fname[32];
 #endif
   /* initialize the entity counter to 0 */
@@ -95,7 +95,7 @@ int SNetThreadingInit(int argc, char **argv)
   }
 #endif
 
-#if USE_USER_EVENT_LOGGING
+#ifdef USE_USER_EVENT_LOGGING
   snprintf(fname, 31, "mon_n%02u_info.log", SNetDistribGetNodeId());
   SNetThreadingMonitoringInit(fname);
 #endif
