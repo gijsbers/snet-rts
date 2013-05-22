@@ -1,45 +1,68 @@
 #include "xchannel.h"
-#include "xchannel.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
 #include <time.h>
+#include "xchannel.c"
 
+void *SNetMemAlloc(size_t s) { return malloc(s); }
 void *SNetMemAlign(size_t s) { return malloc(s); }
 void SNetMemFree(void *p) { return free(p); }
 
 int main(int argc, char **argv)
 {
-  int channels = 1000;
+  int ch, channels = 1000;
   long out = 0;
   long in = 0;
+  int c, verb = 0;
+  unsigned seed = 0;
 
-  srand((unsigned) getpid() + time(NULL));
+  while ((c = getopt(argc, argv, "vs:")) != EOF) {
+    switch (c) {
+      case 'v': verb = 1; break;
+      case 's': sscanf(optarg, "%u", &seed); break;
+      default: printf("%s: bad option -%c\n", *argv, c); exit(1);
+    }
+  }
 
-  while (--channels >= 0) {
+  if (!seed) {
+    seed = (unsigned) (getpid() + time(NULL));
+  }
+  srand(seed);
+
+  for (ch = 1; ch <= channels; ++ch) {
     channel_t *chan = SNetChannelCreate();
+    int written = 0, reads = 0;
     int repeats = 1000;
-    int n = 0;
-    while (--repeats >= 0) {
-      int r = rand() & 63;
-      while (--r >= 0) {
+    int rep;
+    int get, gets;
+    for (rep = 1; rep <= repeats; ++rep) {
+      int put, puts = rand() & 63;
+      for (put = 1; put <= puts; ++put) {
         long *l = malloc(sizeof(long));
         *l = ++out;
         SNetChannelPut(chan, l);
-        ++n;
+        ++written;
       }
-      r = (repeats) ? (rand() & 63) : n;
-      while (n > 0 && --r >= 0) {
+      gets = (rep < repeats) ? (rand() & 63) : (written - reads);
+      if (gets > written - reads) {
+        gets = written - reads;
+      }
+      for (get = 1; get <= gets; ++get) {
         long *l = SNetChannelGet(chan);
         assert(l);
         ++in;
-        assert(*l == in);
+        if (*l != in) {
+          printf("*l %ld != in %ld, wrn %d, rds %d\n", *l, in, written, reads);
+          exit(1);
+        }
         free(l);
-        --n;
+        ++reads;
       }
     }
     SNetChannelDestroy(chan);
+    if (verb) printf("Channel %4d done\n", ch);
   }
   printf("%ld puts and gets: OK\n", in);
 
