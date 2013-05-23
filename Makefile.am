@@ -164,6 +164,7 @@ libfrontrt_la_SOURCES = \
 	src/runtime/front/trace.c \
 	src/runtime/front/trace.h \
 	src/runtime/front/xbox.c \
+	src/runtime/front/xchannel.c \
 	src/runtime/front/xcoll.c \
 	src/runtime/front/xdet.c \
 	src/runtime/front/xdripback.c \

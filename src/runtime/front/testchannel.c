@@ -10,26 +10,13 @@ void *SNetMemAlloc(size_t s) { return malloc(s); }
 void *SNetMemAlign(size_t s) { return malloc(s); }
 void SNetMemFree(void *p) { return free(p); }
 
-int main(int argc, char **argv)
+static int verb;
+
+static void test_single(void)
 {
   int ch, channels = 1000;
   long out = 0;
   long in = 0;
-  int c, verb = 0;
-  unsigned seed = 0;
-
-  while ((c = getopt(argc, argv, "vs:")) != EOF) {
-    switch (c) {
-      case 'v': verb = 1; break;
-      case 's': sscanf(optarg, "%u", &seed); break;
-      default: printf("%s: bad option -%c\n", *argv, c); exit(1);
-    }
-  }
-
-  if (!seed) {
-    seed = (unsigned) (getpid() + time(NULL));
-  }
-  srand(seed);
 
   for (ch = 1; ch <= channels; ++ch) {
     channel_t *chan = SNetChannelCreate();
@@ -65,6 +52,27 @@ int main(int argc, char **argv)
     if (verb) printf("Channel %4d done\n", ch);
   }
   printf("%ld puts and gets: OK\n", in);
+}
+
+int main(int argc, char **argv)
+{
+  int c;
+  unsigned seed = 0;
+
+  while ((c = getopt(argc, argv, "vs:")) != EOF) {
+    switch (c) {
+      case 'v': verb = 1; break;
+      case 's': sscanf(optarg, "%u", &seed); break;
+      default: printf("%s: bad option -%c\n", *argv, c); exit(1);
+    }
+  }
+
+  if (!seed) {
+    seed = (unsigned) (getpid() + time(NULL));
+  }
+  srand(seed);
+
+  test_single();
 
   return 0;
 }

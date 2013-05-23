@@ -505,13 +505,18 @@ struct landing {
 #define LAND_INCR(land)                 AAF(&(land)->refs, 1)
 #define LAND_DECR(land)                 SAF(&(land)->refs, 1)
 
+/* Define channel_t as opaque. See xchannel.h for details. */
+typedef struct channel {
+  void                 *data[128/sizeof(void*)];
+} channel_t;
+
 /* A stream descriptor is the instantiation of a stream. */
 struct snet_stream_desc_t {
   snet_stream_t        *stream;         /* stream between two nodes */
   landing_t            *landing;        /* destination landing */
   landing_t            *source;         /* originating landing */
-  fifo_t                fifo;           /* a FIFO queue for records */
   int                   refs;           /* reference counter */
+  channel_t             chan;           /* opaque channel */
 };
 #define DESC_LAND_SPEC(desc,type)       LAND_SPEC((desc)->landing, type)
 #define DESC_NODE(desc)                 ((desc)->landing->node)

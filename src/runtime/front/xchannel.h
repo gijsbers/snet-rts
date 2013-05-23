@@ -17,8 +17,9 @@
 #define CHAN_DATA_SIZE          VOID_PTRS(CHAN_NODE_BYTES - CHAN_DATA_OFFSET)
 
 /* Initial number of data elements in the first channel node. */
-#define CHAN_INIT_SIZE          VOID_PTRS(CHAN_NODE_BYTES - sizeof(chan_read_t) \
-                                                          - sizeof(chan_write_t))
+#define CHAN_INIT_SIZE          VOID_PTRS(CHAN_NODE_BYTES \
+                                          - sizeof(chan_read_t) \
+                                          - sizeof(chan_write_t))
 
 typedef struct chan_node        chan_node_t;
 typedef struct chan_read        chan_read_t;

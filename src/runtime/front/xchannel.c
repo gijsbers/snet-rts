@@ -15,6 +15,8 @@
 #include "xchannel.h"
 #include "memfun.h"
 #include <assert.h>
+#include <string.h>
+#include <sys/param.h>
 
 /* Create a subsequent data node for a channel. */
 static chan_node_t *SNetChannelNodeCreate(void)
@@ -72,19 +74,37 @@ void SNetChannelDestroy(channel_t *chan)
   SNetDelete(chan);
 }
 
+/* Append a new data node onto a full channel. */
+static void SNetChannelExpand(channel_t *chan)
+{
+  chan_node_t *p = SNetChannelNodeCreate();
+  *chan->writer.next = p;
+  chan->writer.tail = p;
+  chan->writer.put = &p->data[p->first];
+  chan->writer.next = &p->data[p->next];
+}
+
 /* Append a new item at the tail of a channel. */
 void SNetChannelPut(channel_t *chan, void *item)
 {
   chan_write_t *w = &chan->writer;
   if (w->put == w->next) {
-    chan_node_t *p = SNetChannelNodeCreate();
-    *w->next = p;
-    w->tail = p;
-    w->put = &p->data[p->first];
-    w->next = &p->data[p->next];
+    SNetChannelExpand(chan);
   }
   assert(item && w->put < w->next);
   *w->put++ = item;
+}
+
+/* Move a reader to the next data node. */
+static void SNetChannelAdvance(channel_t *chan)
+{
+  chan_node_t *p = (chan_node_t *) *chan->reader.next;
+  if (chan->reader.head != (chan_node_t *) &chan->node[0]) {
+    SNetMemFree(chan->reader.head);
+  }
+  chan->reader.head = p;
+  chan->reader.get = &p->data[p->first];
+  chan->reader.next = &p->data[p->next];
 }
 
 /* Retrieve an item from the head of a channel. */
@@ -94,13 +114,7 @@ void *SNetChannelGet(channel_t *chan)
   chan_read_t  *r = &chan->reader;
 
   if (r->get == r->next) {
-    chan_node_t *p = *r->next;
-    if (r->head != (chan_node_t *) &chan->node[0]) {
-      SNetMemFree(r->head);
-    }
-    r->head = p;
-    r->get = &p->data[p->first];
-    r->next = &p->data[p->next];
+    SNetChannelAdvance(chan);
   }
   item = *r->get++;
   assert(item && r->get <= r->next);
@@ -118,4 +132,77 @@ void *SNetChannelPutGet(channel_t *chan, void *item)
     return SNetChannelGet(chan);
   }
 }
+
+/* Count the number of records in the channel. */
+static int SNetChannelCount(channel_t *chan)
+{
+  chan_node_t  *node;
+  int           count = 0;
+
+  if (chan->reader.head == chan->writer.tail) {
+    count += chan->writer.put - chan->reader.get;
+  }
+  else {
+    count += chan->reader.next - chan->reader.get;
+    node = (chan_node_t *) *chan->reader.next;
+    while (node != chan->writer.tail) {
+      count += node->next - node->first;
+      node = (chan_node_t *) node->data[node->next];
+    }
+    count += chan->writer.put - &node->data[node->first];
+  }
+
+  return count;
+}
+
+/* Append the contents of the second channel onto the first.
+ * Return the number of migrated records. */
+int SNetChannelMerge(channel_t *first, channel_t *second)
+{
+  const int     count = SNetChannelCount(second);
+
+  if (count > 0) {
+    int done = 0;
+    if (second->reader.head == (chan_node_t *) &second->node[0]) {
+      int todo = (second->reader.head == second->writer.tail) ?
+                 (second->writer.put - second->reader.get) :
+                 (second->reader.next - second->reader.get);
+      int left = first->writer.next - first->writer.put;
+      size_t copy_bytes = todo * sizeof(void *);
+      if (todo > left) {
+        first->writer.next = first->writer.put;
+        first->writer.tail->next = first->writer.put
+                                 - first->writer.tail->data;
+        SNetChannelExpand(first);
+        left = first->writer.next - first->writer.put;
+      }
+      memcpy(first->writer.put, second->reader.get, copy_bytes);
+      first->writer.put += todo;
+      second->reader.get += todo;
+      done += todo;
+    }
+    if (done < count) {
+      first->writer.next = first->writer.put;
+      first->writer.tail->next = first->writer.put
+                               - first->writer.tail->data;
+      if (second->reader.get == second->reader.next) {
+        SNetChannelAdvance(second);
+      }
+      *first->writer.next = second->reader.head;
+      first->writer = second->writer;
+      second->reader.head->first = second->reader.get
+                                 - second->reader.head->data;
+    }
+    SNetChannelInit(second);
+  }
+
+  return count;
+}
+
+
+
+
+
+
+
 

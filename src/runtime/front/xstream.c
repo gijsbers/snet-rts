@@ -28,7 +28,7 @@ void SNetStreamDestroy(snet_stream_t *stream)
 void SNetStreamWrite(snet_stream_desc_t *desc, snet_record_t *rec)
 {
   DESC_INCR(desc);
-  SNetFifoPut(&desc->fifo, rec);
+  SNetChannelPut(&desc->chan, rec);
   assert(desc->source->worker);
   SNetWorkerTodo(desc->source->worker, desc);
 }
@@ -43,6 +43,7 @@ static snet_stream_desc_t *SNetMergeStreams(snet_stream_desc_t **desc_ptr)
   fifo_node_t           *node;
   int                    count = 0;
 
+  #if 0
   /* Remove all data from the queue towards the garbage landing. */
   fifo_tail_start = SNetFifoGetTail(&desc->fifo, &fifo_tail_end);
 
@@ -53,6 +54,7 @@ static snet_stream_desc_t *SNetMergeStreams(snet_stream_desc_t **desc_ptr)
 
   /* Append the captured list onto the subsequent stream. */
   SNetFifoPutTail(&next->fifo, fifo_tail_start, fifo_tail_end);
+  #endif
 
   /* Reconnect the source landing of the next landing. */
   next->source = desc->source;
@@ -102,13 +104,14 @@ void SNetWrite(snet_stream_desc_t **desc_ptr, snet_record_t *rec, bool last)
    * lock the destination landing then process the record right away. */
   if (last && land->id == 0 && trylock_landing(land, worker)) {
     /* Make sure we process records in stream FIFO order. */
-    worker->continue_rec = (snet_record_t *) SNetFifoPutGet(&desc->fifo, rec);
+    worker->continue_rec = (snet_record_t *)
+                           SNetChannelPutGet(&desc->chan, rec);
     assert(worker->continue_rec);
     worker->continue_desc = desc;
   }
   else {
     /* Store the record into the destination stream. */
-    SNetFifoPut(&desc->fifo, rec);
+    SNetChannelPut(&desc->chan, rec);
     /* Add a todo item to this worker's todo queue. */
     SNetWorkerTodo(worker, desc);
   }
@@ -117,7 +120,7 @@ void SNetWrite(snet_stream_desc_t **desc_ptr, snet_record_t *rec, bool last)
 /* Dequeue a record and process it. */
 void SNetStreamWork(snet_stream_desc_t *desc, worker_t *worker)
 {
-  snet_record_t *rec    = (snet_record_t *) SNetFifoGet(&desc->fifo);
+  snet_record_t *rec    = (snet_record_t *) SNetChannelGet(&desc->chan);
   landing_t     *land   = desc->landing;
 
   assert(rec);
@@ -146,7 +149,7 @@ void SNetStreamClose(snet_stream_desc_t *desc)
 {
   trace(__func__);
   assert(desc->refs == 0);
-  SNetFifoDone(&desc->fifo);
+  SNetChannelDone(&desc->chan);
   SNetDelete(desc);
 }
 
@@ -205,7 +208,7 @@ snet_stream_desc_t *SNetStreamOpen(
   DESC_STREAM(desc) = stream;
   desc->source = prev->landing;
   desc->refs = 1;
-  SNetFifoInit(&desc->fifo);
+  SNetChannelInit(&desc->chan);
 
   switch (NODE_TYPE(stream->dest)) {
 
