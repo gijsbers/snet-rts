@@ -23,9 +23,10 @@ static void test_merge(void)
     int ins, inserts = rand() & 255;
     int intake = rand() % (inserts + 1);
     int aps, appends = rand() & 255;
-    int get, gets = inserts + appends;
     int aptake = rand() % (appends + 1);
+    int get, gets = inserts + appends - intake - aptake;
     long in1, in2, ap1, ap2;
+    int count;
 
     in1 = in;
     for (ins = 1; ins <= inserts; ++ins) {
@@ -65,16 +66,25 @@ static void test_merge(void)
       free(i);
     }
 
-    SNetChannelMerge(first, second);
+    count = SNetChannelMerge(first, second);
+    if (count != appends - aptake) {
+      printf("count %d != appends %d - aptake %d\n",
+             count, appends, aptake);
+    }
 
-    out = in1;
+    out = (in1 < in2) ? in1 : ap1;
     for (get = 1; get <= gets; ++get) {
+      if ((in1 <= out && out < in2) || (ap1 <= out && out < ap2));else {
+        printf("in1 %ld, out %ld, in2 %ld, ap1 %ld, out %ld, ap2 %ld\n",
+              in1, out, in2, ap1, out, ap2);
+        exit(1);
+      }
       long *i = SNetChannelGet(first);
       assert(i);
       ++out;
       if (*i != out) {
-        printf("*i %ld != in %ld, in %ld, ins %d, aps %d, in1 %ld, in2 %ld, ap1 %ld, ap2 %ld\n",
-               *i, out, in, inserts, appends, in1, in2, ap1, ap2);
+        printf("%d: *i %ld != in %ld, in %ld, ins %d, aps %d, in1 %ld, in2 %ld, ap1 %ld, ap2 %ld\n",
+               __LINE__, *i, out, in, inserts, appends, in1, in2, ap1, ap2);
         exit(1);
       }
       free(i);
@@ -82,6 +92,7 @@ static void test_merge(void)
         out = ap1;
       }
     }
+
     SNetChannelDestroy(first);
     SNetChannelDestroy(second);
   }
