@@ -12,6 +12,82 @@ void SNetMemFree(void *p) { return free(p); }
 
 static int verb;
 
+static void test_merge(void)
+{
+  int mg, merges = 100000;
+  long in = 0, out = 0;
+
+  for (mg = 1; mg <= merges; ++mg) {
+    channel_t *first = SNetChannelCreate();
+    channel_t *second = SNetChannelCreate();
+    int ins, inserts = rand() & 255;
+    int intake = rand() % (inserts + 1);
+    int aps, appends = rand() & 255;
+    int get, gets = inserts + appends;
+    int aptake = rand() % (appends + 1);
+    long in1, in2, ap1, ap2;
+
+    in1 = in;
+    for (ins = 1; ins <= inserts; ++ins) {
+      long *i = malloc(sizeof(long));
+      *i = ++in;
+      SNetChannelPut(first, i);
+    }
+    in2 = in;
+
+    for (get = 1; get <= intake; ++get) {
+      long *i = SNetChannelGet(first);
+      assert(i);
+      if (*i != ++in1) {
+        printf("*i %ld != in1 %ld, in %ld, ins %d, aps %d, in1 %ld, in2 %ld\n",
+               *i, in1, in, inserts, appends, in1, in2);
+        exit(1);
+      }
+      free(i);
+    }
+
+    ap1 = in;
+    for (aps = 1; aps <= appends; ++aps) {
+      long *i = malloc(sizeof(long));
+      *i = ++in;
+      SNetChannelPut(second, i);
+    }
+    ap2 = in;
+
+    for (get = 1; get <= aptake; ++get) {
+      long *i = SNetChannelGet(second);
+      assert(i);
+      if (*i != ++ap1) {
+        printf("*i %ld != ap1 %ld, in %ld, ins %d, aps %d, in1 %ld, in2 %ld, ap1 %ld, ap2 %ld\n",
+               *i, ap1, in, inserts, appends, in1, in2, ap1, ap2);
+        exit(1);
+      }
+      free(i);
+    }
+
+    SNetChannelMerge(first, second);
+
+    out = in1;
+    for (get = 1; get <= gets; ++get) {
+      long *i = SNetChannelGet(first);
+      assert(i);
+      ++out;
+      if (*i != out) {
+        printf("*i %ld != in %ld, in %ld, ins %d, aps %d, in1 %ld, in2 %ld, ap1 %ld, ap2 %ld\n",
+               *i, out, in, inserts, appends, in1, in2, ap1, ap2);
+        exit(1);
+      }
+      free(i);
+      if (out == in2) {
+        out = ap1;
+      }
+    }
+    SNetChannelDestroy(first);
+    SNetChannelDestroy(second);
+  }
+  printf("%ld puts and gets: OK\n", in);
+}
+
 static void test_single(void)
 {
   int ch, channels = 1000;
@@ -57,12 +133,14 @@ static void test_single(void)
 int main(int argc, char **argv)
 {
   int c;
+  int merg = 1, sing = 1;
   unsigned seed = 0;
 
-  while ((c = getopt(argc, argv, "vs:")) != EOF) {
+  while ((c = getopt(argc, argv, "vms:")) != EOF) {
     switch (c) {
       case 'v': verb = 1; break;
       case 's': sscanf(optarg, "%u", &seed); break;
+      case 'm': merg = 1; sing = 0; break;
       default: printf("%s: bad option -%c\n", *argv, c); exit(1);
     }
   }
@@ -72,7 +150,12 @@ int main(int argc, char **argv)
   }
   srand(seed);
 
-  test_single();
+  if (merg) {
+    test_merge();
+  }
+  if (sing) {
+    test_single();
+  }
 
   return 0;
 }

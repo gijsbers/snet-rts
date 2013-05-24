@@ -71,6 +71,10 @@ void *SNetChannelGet(channel_t *chan);
 /* A fused send/recv if caller owns both sides. */
 void *SNetChannelPutGet(channel_t *chan, void *item);
 
+/* Append the contents of the second channel onto the first.
+ * Return the number of migrated records. */
+int SNetChannelMerge(channel_t *first, channel_t *second);
+
 /* xcoll.c */
 
 

@@ -43,18 +43,8 @@ static snet_stream_desc_t *SNetMergeStreams(snet_stream_desc_t **desc_ptr)
   fifo_node_t           *node;
   int                    count = 0;
 
-  #if 0
-  /* Remove all data from the queue towards the garbage landing. */
-  fifo_tail_start = SNetFifoGetTail(&desc->fifo, &fifo_tail_end);
-
-  /* Count the number of data items in the captured list. */
-  for (node = fifo_tail_start; node; node = node->next) {
-    ++count;
-  }
-
-  /* Append the captured list onto the subsequent stream. */
-  SNetFifoPutTail(&next->fifo, fifo_tail_start, fifo_tail_end);
-  #endif
+  /* Merge two channels into one. */
+  count = SNetChannelMerge(&desc->chan, &next->chan);
 
   /* Reconnect the source landing of the next landing. */
   next->source = desc->source;
@@ -63,7 +53,7 @@ static snet_stream_desc_t *SNetMergeStreams(snet_stream_desc_t **desc_ptr)
   AAF(&(next->refs), count);
 
   /* Report statistics. */
-  if (SNetDebug()) {
+  if (1 || SNetDebug()) {
     printf("%s: collecting %d recs, %d drefs, %d nrefs\n",
             __func__, count, desc->refs, next->refs);
   }
