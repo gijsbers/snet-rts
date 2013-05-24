@@ -38,9 +38,6 @@ static snet_stream_desc_t *SNetMergeStreams(snet_stream_desc_t **desc_ptr)
 {
   snet_stream_desc_t    *desc = *desc_ptr;
   snet_stream_desc_t    *next = DESC_LAND_SPEC(desc, identity)->outdesc;
-  fifo_node_t           *fifo_tail_start;
-  fifo_node_t           *fifo_tail_end;
-  fifo_node_t           *node;
   int                    count = 0;
 
   /* Merge two channels into one. */

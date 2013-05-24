@@ -18,6 +18,51 @@
 #include <string.h>
 #include <sys/param.h>
 
+#define CHAN_NODE_CHECK(n) \
+        assert(n->first >= 0 && n->first <= n->next)
+
+#define CHAN_PTR_CHECK(n, p) \
+        assert(p >= n->data + n->first); \
+        assert(p <= n->data + n->next)
+
+#define CHAN_READER_CHECK(r, h) \
+        CHAN_PTR_CHECK(h, r.get); \
+        CHAN_PTR_CHECK(h, r.next)
+
+#define CHAN_WRITER_CHECK(w, t) \
+        CHAN_PTR_CHECK(t, w.put); \
+        CHAN_PTR_CHECK(t, w.next)
+
+#define CHAN_CHECK(c) \
+        CHAN_NODE_CHECK(c->reader.head); \
+        CHAN_NODE_CHECK(c->writer.tail); \
+        CHAN_READER_CHECK(c->reader, c->reader.head); \
+        CHAN_WRITER_CHECK(c->writer, c->writer.tail)
+
+/* Count the number of records in the channel. */
+static int SNetChannelCount(channel_t *chan)
+{
+  chan_node_t  *node;
+  int           count = 0;
+
+  CHAN_CHECK(chan);
+
+  if (chan->reader.head == chan->writer.tail) {
+    count += chan->writer.put - chan->reader.get;
+  }
+  else {
+    count += chan->reader.next - chan->reader.get;
+    node = (chan_node_t *) *chan->reader.next;
+    while (node != chan->writer.tail) {
+      count += node->next - node->first;
+      node = (chan_node_t *) node->data[node->next];
+    }
+    count += chan->writer.put - &node->data[node->first];
+  }
+
+  return count;
+}
+
 /* Create a subsequent data node for a channel. */
 static chan_node_t *SNetChannelNodeCreate(void)
 {
@@ -59,12 +104,16 @@ channel_t *SNetChannelCreate(void)
 /* Cleanup a channel. */
 void SNetChannelDone(channel_t *chan)
 {
+#if 0
+  int count = SNetChannelCount(chan);
+  assert(count == 0);
   assert(chan->reader.head == chan->writer.tail);
   assert(chan->reader.get == chan->writer.put);
   assert(chan->reader.next == chan->writer.next);
   if (chan->reader.head != (chan_node_t *) &chan->node[0]) {
     SNetDelete(chan->reader.head);
   }
+#endif
 }
 
 /* Delete a channel. */
@@ -136,56 +185,13 @@ void *SNetChannelPutGet(channel_t *chan, void *item)
   }
 }
 
-#define CHAN_NODE_CHECK(n) \
-        assert(n->first >= 0 && n->first <= n->next)
-
-#define CHAN_PTR_CHECK(n, p) \
-        assert(p >= n->data + n->first); \
-        assert(p <= n->data + n->next)
-
-#define CHAN_READER_CHECK(r, h) \
-        CHAN_PTR_CHECK(h, r.get); \
-        CHAN_PTR_CHECK(h, r.next)
-
-#define CHAN_WRITER_CHECK(w, t) \
-        CHAN_PTR_CHECK(t, w.put); \
-        CHAN_PTR_CHECK(t, w.next)
-
-#define CHAN_CHECK(c) \
-        CHAN_NODE_CHECK(c->reader.head); \
-        CHAN_NODE_CHECK(c->writer.tail); \
-        CHAN_READER_CHECK(c->reader, c->reader.head); \
-        CHAN_WRITER_CHECK(c->writer, c->writer.tail)
-
-/* Count the number of records in the channel. */
-static int SNetChannelCount(channel_t *chan)
-{
-  chan_node_t  *node;
-  int           count = 0;
-
-  CHAN_CHECK(chan);
-
-  if (chan->reader.head == chan->writer.tail) {
-    count += chan->writer.put - chan->reader.get;
-  }
-  else {
-    count += chan->reader.next - chan->reader.get;
-    node = (chan_node_t *) *chan->reader.next;
-    while (node != chan->writer.tail) {
-      count += node->next - node->first;
-      node = (chan_node_t *) node->data[node->next];
-    }
-    count += chan->writer.put - &node->data[node->first];
-  }
-
-  return count;
-}
-
 /* Append the contents of the second channel onto the first.
  * Return the number of migrated records. */
 int SNetChannelMerge(channel_t *first, channel_t *second)
 {
   const int     count = SNetChannelCount(second);
+  const int     c1    = SNetChannelCount(first);
+  int c2;
 
   CHAN_CHECK(first);
   CHAN_CHECK(second);
@@ -229,6 +235,9 @@ int SNetChannelMerge(channel_t *first, channel_t *second)
   }
 
   CHAN_CHECK(first);
+
+  c2 = SNetChannelCount(first);
+  assert(c1 + count == c2);
 
   return count;
 }
