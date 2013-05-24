@@ -137,7 +137,7 @@ void *SNetChannelPutGet(channel_t *chan, void *item)
 }
 
 #define CHAN_NODE_CHECK(n) \
-        assert(n->first >= 0 && n->first < n->next)
+        assert(n->first >= 0 && n->first <= n->next)
 
 #define CHAN_PTR_CHECK(n, p) \
         assert(p >= n->data + n->first); \
@@ -185,7 +185,6 @@ static int SNetChannelCount(channel_t *chan)
  * Return the number of migrated records. */
 int SNetChannelMerge(channel_t *first, channel_t *second)
 {
-  int c1 = SNetChannelCount(first), c2 = SNetChannelCount(second), c3;
   const int     count = SNetChannelCount(second);
 
   CHAN_CHECK(first);
@@ -212,10 +211,12 @@ int SNetChannelMerge(channel_t *first, channel_t *second)
       done += todo;
     }
     if (done < count) {
-      assert(SNetChannelCount(second) == count - done);
       first->writer.next = first->writer.put;
       first->writer.tail->next = first->writer.put
                                - first->writer.tail->data;
+      if (first->reader.head == first->writer.tail) {
+        first->reader.next = first->writer.next;
+      }
       if (second->reader.get == second->reader.next) {
         SNetChannelAdvance(second);
       }
@@ -227,21 +228,8 @@ int SNetChannelMerge(channel_t *first, channel_t *second)
     SNetChannelInit(second);
   }
 
-  c3 = SNetChannelCount(first);
-  if (c1 + c2 != c3) {
-    printf("c1 %d + c2 %d != c3 %d\n", c1, c2, c3);
-    exit(1);
-  }
-
   CHAN_CHECK(first);
 
   return count;
 }
-
-
-
-
-
-
-
 
