@@ -45,7 +45,7 @@ static int SNetChannelCount(channel_t *chan)
   chan_node_t  *node;
   int           count = 0;
 
-  CHAN_CHECK(chan);
+  // CHAN_CHECK(chan);
 
   if (chan->reader.head == chan->writer.tail) {
     count += chan->writer.put - chan->reader.get;
@@ -77,7 +77,7 @@ void SNetChannelInit(channel_t *chan)
 {
   chan_node_t *node = (chan_node_t *) &chan->node[0];
   node->first = 0;
-  node->next = -1 - CHAN_DATA_OFFSET + CHAN_INIT_SIZE;
+  node->next = CHAN_INIT_SIZE -1 - VOID_PTRS(CHAN_DATA_OFFSET);
   chan->reader.head = node;
   chan->reader.get = &node->data[node->first];
   chan->reader.next = &node->data[node->next];
@@ -104,16 +104,12 @@ channel_t *SNetChannelCreate(void)
 /* Cleanup a channel. */
 void SNetChannelDone(channel_t *chan)
 {
-#if 0
-  int count = SNetChannelCount(chan);
-  assert(count == 0);
   assert(chan->reader.head == chan->writer.tail);
   assert(chan->reader.get == chan->writer.put);
   assert(chan->reader.next == chan->writer.next);
   if (chan->reader.head != (chan_node_t *) &chan->node[0]) {
     SNetDelete(chan->reader.head);
   }
-#endif
 }
 
 /* Delete a channel. */
@@ -190,14 +186,12 @@ void *SNetChannelPutGet(channel_t *chan, void *item)
 int SNetChannelMerge(channel_t *first, channel_t *second)
 {
   const int     count = SNetChannelCount(second);
-  const int     c1    = SNetChannelCount(first);
-  int c2;
+  int done = 0;
 
-  CHAN_CHECK(first);
-  CHAN_CHECK(second);
+  // CHAN_CHECK(first);
+  // CHAN_CHECK(second);
 
   if (count > 0) {
-    int done = 0;
     if (second->reader.head == (chan_node_t *) &second->node[0]) {
       int todo = (second->reader.head == second->writer.tail) ?
                  (second->writer.put - second->reader.get) :
@@ -208,8 +202,11 @@ int SNetChannelMerge(channel_t *first, channel_t *second)
         first->writer.next = first->writer.put;
         first->writer.tail->next = first->writer.put
                                  - first->writer.tail->data;
+        if (first->reader.head == first->writer.tail) {
+          first->reader.next = first->writer.next;
+          assert(first->reader.next >= first->reader.get);
+        }
         SNetChannelExpand(first);
-        left = first->writer.next - first->writer.put;
       }
       memcpy(first->writer.put, second->reader.get, copy_bytes);
       first->writer.put += todo;
@@ -233,11 +230,7 @@ int SNetChannelMerge(channel_t *first, channel_t *second)
     }
     SNetChannelInit(second);
   }
-
-  CHAN_CHECK(first);
-
-  c2 = SNetChannelCount(first);
-  assert(c1 + count == c2);
+  // CHAN_CHECK(first);
 
   return count;
 }

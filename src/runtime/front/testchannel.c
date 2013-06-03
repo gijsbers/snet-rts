@@ -38,6 +38,8 @@ static state_t *new_state(void)
 
 static void del_state(state_t *st)
 {
+  SNetChannelDestroy(st->chan);
+  st->chan = NULL;
   free(st);
 }
 
@@ -50,7 +52,6 @@ static void append(state_t *st)
 {
   long *n;
   state_t *next = st;
-  check(st);
   while (next->next) {
     next = next->next;
   }
@@ -68,16 +69,20 @@ static state_t *get_last(state_t *st)
   return next;
 }
 
-static bool reduce(state_t *st)
+static void clean_state(state_t *st)
 {
-  check(st);
   while (st->get == st->put && st->next) {
     state_t *next = st->next;
     st->get = next->get;
     st->put = next->put;
     st->next = next->next;
-    del_state(st);
+    free(next);
   }
+}
+
+static bool reduce(state_t *st)
+{
+  clean_state(st);
   if (st->get < st->put) {
     long *n = SNetChannelGet(st->chan);
     assert(*n == st->get);
@@ -90,15 +95,18 @@ static bool reduce(state_t *st)
 
 static bool empty(state_t *st)
 {
-  return st->get == st->put && !st->next && !st->next;
+  clean_state(st);
+  return st->get == st->put && !st->next;
 }
 
 static void merge(state_t *st, state_t *next)
 {
   state_t *last;
+  assert(st != next);
   check(st);
   check(next);
   SNetChannelMerge(st->chan, next->chan);
+  SNetChannelDestroy(next->chan);
   next->chan = NULL;
   last = get_last(st);
   last->next = next;
@@ -109,15 +117,17 @@ static void test_wild(void)
 {
   const int num = 128;
   state_t *arr[num];
-  int i, j, k, nrec = 0, nst = 0, nmrg = 0;
-  const int max_k = 10;
+  int i, j, k, nrec = 0, nst = 0, nmrg = 0, nnew = 0;
+  const int max_k = 1000*1000; //10*1000*1000;
+  const int report = max_k / 10;
 
   for (i = 0; i < num; ++i) {
     arr[i] = NULL;
   }
 
   for (k = 0;; ++k) {
-    if (k < max_k && prob() < 0.05) {
+    double pr = prob();
+    if (k < max_k && pr < 0.02) {
       for (i = 0; i < num; ++i) {
         if (arr[i] == NULL) {
           arr[i] = new_state();
@@ -125,16 +135,17 @@ static void test_wild(void)
         }
       }
     }
-    else if (k < max_k && prob() < 0.60) {
+    else if (k < max_k && pr < 0.53) {
       for (i = rand() % num; i < num; ++i) {
         if (arr[i]) {
           append(arr[i]);
           ++nrec;
+          ++nnew;
           break;
         }
       }
     }
-    else if (prob() < 0.03) {
+    else if (pr > 0.99) {
       for (i = rand() % num; i < num; ++i) {
         if (arr[i]) {
           for (j = rand() % num; j < num; ++j) {
@@ -158,8 +169,6 @@ static void test_wild(void)
           }
           else {
             assert(empty(arr[i]));
-          }
-          if (empty(arr[i])) {
             del_state(arr[i]);
             arr[i] = NULL;
             --nst;
@@ -172,8 +181,8 @@ static void test_wild(void)
       printf("done at k = %d\n", k);
       break;
     }
-    if (k % 100 == 0) {
-      printf("st %d, rec %d, merg %d\n", nst, nrec, nmrg);
+    if ((k + 1) % report == 0) {
+      printf("%8d:  st %4d, rec %6d, merg %6d, new %6d\n", k, nst, nrec, nmrg, nnew);
     }
   }
   for (i = 0; i < num; ++i) {

@@ -41,7 +41,7 @@ static snet_stream_desc_t *SNetMergeStreams(snet_stream_desc_t **desc_ptr)
   int                    count = 0;
 
   /* Merge two channels into one. */
-  count = SNetChannelMerge(&desc->chan, &next->chan);
+  count = SNetChannelMerge(&next->chan, &desc->chan);
 
   /* Reconnect the source landing of the next landing. */
   next->source = desc->source;
@@ -50,7 +50,7 @@ static snet_stream_desc_t *SNetMergeStreams(snet_stream_desc_t **desc_ptr)
   AAF(&(next->refs), count);
 
   /* Report statistics. */
-  if (1 || SNetDebug()) {
+  if (SNetDebug()) {
     printf("%s: collecting %d recs, %d drefs, %d nrefs\n",
             __func__, count, desc->refs, next->refs);
   }

@@ -8,7 +8,7 @@
 #define CHAN_NODE_BYTES         128
 
 /* Offset of 'data' element in chan_node. */
-#define CHAN_DATA_OFFSET        offsetof(chan_node_t, data)
+#define CHAN_DATA_OFFSET        (int) offsetof(chan_node_t, data)
 
 /* Number of void pointers in a node. */
 #define VOID_PTRS(x)            ((x) / sizeof(void*))
