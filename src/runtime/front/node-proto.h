@@ -130,7 +130,7 @@ void SNetDetLeaveRec(snet_record_t *rec, landing_t *landing);
 
 /* xdistrib.c */
 
-void hello(const char *s);
+void SNetDistribHello(const char *s);
 
 /* Initialize distributed computing. Called by SNetInRun in networkinterface.c. */
 void SNetDistribInit(int argc, char **argv, snet_info_t *info);
@@ -168,6 +168,14 @@ snet_stream_t *SNetDripBack(
     snet_variant_list_t *back_patterns,
     snet_expr_list_t    *guards,
     snet_startup_fun_t   box_a);
+
+/* xdynres.c */
+
+void SNetBindLogicalProc(int proc);
+void SNetLoadManagerRun(worker_t* worker);
+
+/* Dynamic resource management via the resource server. */
+void SNetMasterResource(worker_config_t* config, int recv);
 
 /* xfeedback.c */
 
@@ -413,6 +421,12 @@ void SNetInputManagerStart(void);
 /* Cleanup input manager. */
 void SNetInputManagerStop(void);
 
+/* Retrieve a reference to a node hostname. */
+char* SNetInputManagerGetHostname(int node);
+
+/* Find out if we have access to a named node. */
+bool SNetInputManagerGetNode(const char* host, int* node);
+
 /* Process one input message. */
 bool SNetInputManagerDoTask(worker_t *worker);
 
@@ -442,7 +456,7 @@ snet_stream_t *SNetNameShift(
 
 /* xnodist.c */
 
-void hello(const char *s);
+void SNetDistribHello(const char *s);
 
 /* Initialize distributed computing. Called by SNetInRun in networkinterface.c. */
 void SNetDistribInit(int argc, char **argv, snet_info_t *info);
@@ -582,21 +596,18 @@ worker_config_t* SNetCreateWorkerConfig(
   int pipe_send,
   snet_stream_t *input,
   snet_stream_t *output);
+void SNetDestroyWorkerConfig(worker_config_t* config, int max_worker);
+
+/* Transmit a message from a worker to the master. */
+void SNetPipeSend(int fd, const pipe_mesg_t* mesg);
+
+/* Receive a message from a worker by the master. */
+void SNetPipeReceive(int fd, pipe_mesg_t* mesg);
 
 /* Transmit a MesgBusy to the master. */
 void SNetNodeWorkerBusy(worker_t* worker);
 
-/* Direct a newly created Pthread to work. */
-void *SNetNodeThreadStart(void *arg);
-
-/* Start a number of workers and wait for all to finish. */
-void SNetMasterStatic(
-  const int num_workers,
-  const int num_managers,
-  worker_config_t* config,
-  const int recv);
-
-/* Activate a new worker thread. */
+/* Activate one new worker thread. */
 void SNetMasterStartOne(int id, worker_config_t* config, int proc);
 
 /* Return a bitmask of 1/2/3 when input is available within a given delay. */
@@ -604,10 +615,6 @@ int SNetWaitForInput(int pipe, int sock, double delay);
 
 /* Throttle number of workers by work load. */
 void SNetMasterDynamic(worker_config_t* config, int recv);
-void SNetBindLogicalProc(int proc);
-
-/* Dynamic resource management via the resource server. */
-void SNetMasterResource(worker_config_t* config, int recv);
 
 /* Create workers and start them. */
 void SNetNodeRun(snet_stream_t *input, snet_info_t *info, snet_stream_t *output);

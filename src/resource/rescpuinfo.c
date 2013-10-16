@@ -130,7 +130,8 @@ resource_t* res_cpuinfo_resource_init(void)
     root = res_parse_cpuinfo(fp);
     fclose(fp);
   } else {
-    res_warn("Could not open file %s: %s.\n", infile, strerror(errno));
+    res_warn("%s:[%s]: Could not open file %s: %s.\n",
+             res_get_program_name(), __func__, infile, strerror(errno));
   }
 
   return root;

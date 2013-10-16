@@ -52,6 +52,8 @@ bool SNetDistribIsRootNode(void) { return node_location == ROOT_LOCATION; }
 
 bool SNetDistribIsDistributed(void) { return true; }
 
+int SNetDistribGetSize(void) { int n; MPI_Comm_size(MPI_COMM_WORLD, &n); return n; }
+
 void SNetDistribPack(void *src, ...)
 {
   va_list args;

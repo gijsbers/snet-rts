@@ -213,7 +213,7 @@ void SNetNodeSync(snet_stream_desc_t *desc, snet_record_t *rec)
       else if (SNetNodeSyncData(rec, sarg, land) && sarg->garbage_collect) {
         if (sarg->merged_type_sync) {
           /* Examine the type of the subsequent landing. */
-          switch ((int) land->outdesc->landing->type) {
+          switch ((int) DESC_LAND_TYPE(land->outdesc)) {
             case LAND_parallel:
             case LAND_identity:
               /* Only parallel dispatchers can benefit from this. */

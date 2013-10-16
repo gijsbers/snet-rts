@@ -35,51 +35,34 @@ static bool             opt_zipper;
 
 /* Total number of cores in system, whether currently online or not. */
 int SNetGetMaxProcs(void)
-{
-  return (int) sysconf(_SC_NPROCESSORS_CONF);
-}
+{ return (int) sysconf(_SC_NPROCESSORS_CONF); }
 
 /* The number of cores in the system which are currently operational. */
 int SNetGetNumProcs(void)
-{
-  return (int) sysconf(_SC_NPROCESSORS_ONLN);
-}
+{ return (int) sysconf(_SC_NPROCESSORS_ONLN); }
 
 /* How many workers? */
-int SNetThreadingWorkers(void)
-{
-  return num_workers;
-}
+int SNetThreadingWorkers(void) { return num_workers; }
 
 /* Limit the number of actively stealing thieves, if non-zero. */
-int SNetThreadingThieves(void)
-{
-  return num_thieves;
-}
+int SNetThreadingThieves(void) { return num_thieves; }
 
 /* How many distributed computing threads? */
 int SNetThreadedManagers(void)
 {
-  return SNetDistribIsDistributed() ? 1 : 0;
+  int num_threaded = SNetDistribIsDistributed() ? 1 : 0;
+  // num_threaded += (SNetOptResourceServer() != NULL) ? 1 : 0;
+  return num_threaded;
 }
 
 /* Name of this program. */
-const char* SNetGetProgramName(void)
-{
-  return program_name;
-}
+const char* SNetGetProgramName(void) { return program_name; }
 
 /* What kind of garbage collection to use? */
-bool SNetGarbageCollection(void)
-{
-  return opt_garbage_collection;
-}
+bool SNetGarbageCollection(void) { return opt_garbage_collection; }
 
 /* Whether to be verbose */
-bool SNetVerbose(void)
-{
-  return opt_verbose;
-}
+bool SNetVerbose(void) { return opt_verbose; }
 
 /* Whether to enable debugging information */
 bool SNetDebug(void) { return opt_debug; }
@@ -103,52 +86,28 @@ bool SNetDebugTL(void) { return opt_debug_tl; }
 bool SNetDebugWS(void) { return opt_debug_ws; }
 
 /* Whether to use a deterministic feedback */
-bool SNetFeedbackDeterministic(void)
-{
-  return opt_feedback_deterministic;
-}
+bool SNetFeedbackDeterministic(void) { return opt_feedback_deterministic; }
 
 /* Whether to use dynamic resource management. */
-bool SNetOptResource(void)
-{
-  return opt_resource;
-}
+bool SNetOptResource(void) { return opt_resource; }
 
 /* Whether and how to connect to the resource management service. */
-const char* SNetOptResourceServer(void)
-{
-  return opt_resource_server;
-}
+const char* SNetOptResourceServer(void) { return opt_resource_server; }
 
 /* Whether to use optimized sync-star. */
-bool SNetZipperEnabled(void)
-{
-  return opt_zipper;
-}
+bool SNetZipperEnabled(void) { return opt_zipper; }
 
 /* The stack size for worker threads in bytes */
-size_t SNetThreadStackSize(void)
-{
-  return opt_thread_stack_size;
-}
+size_t SNetThreadStackSize(void) { return opt_thread_stack_size; }
 
 /* Whether to apply an input throttle. */
-bool SNetInputThrottle(void)
-{
-  return opt_input_throttle;
-}
+bool SNetInputThrottle(void) { return opt_input_throttle; }
 
 /* The number of unconditional input records. */
-double SNetInputOffset(void)
-{
-  return opt_input_offset;
-}
+double SNetInputOffset(void) { return opt_input_offset; }
 
 /* The rate at which input can increase depending on output. */
-double SNetInputFactor(void)
-{
-  return opt_input_factor;
-}
+double SNetInputFactor(void) { return opt_input_factor; }
 
 /* Extract the box concurrency specification for a given box name.
  * The default concurrency specification can be given as a number,
@@ -327,6 +286,9 @@ int SNetThreadingInit(int argc, char**argv)
       opt_zipper = false;
     }
 
+    /* In addition to the usual command-line arguments from argv
+     * we also examine the environment variable SNET_ARGS for options.
+     * Convert the content of SNET_ARGS into a vector of options in argv. */
     if (i + 1 >= argc &&
         snet_args == NULL &&
         (snet_args = getenv("SNET_ARGS")) != NULL)

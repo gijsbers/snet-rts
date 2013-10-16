@@ -323,7 +323,7 @@ snet_stream_desc_t *SNetStreamOpen(
       /* Collectors receive the previously created landing from the stack */
       desc->landing = SNetPopLanding(prev);
       assert(desc->landing);
-      assert(desc->landing->type == LAND_collector);
+      assert(DESC_LAND_TYPE(desc) == LAND_collector);
       assert(DESC_NODE(desc) == STREAM_DEST(stream));
       assert(desc->landing->refs > 0);
       break;
@@ -380,7 +380,7 @@ snet_stream_desc_t *SNetStreamOpen(
     case NODE_observer2:
       desc->landing = SNetPopLanding(prev);
       assert(desc->landing);
-      assert(desc->landing->type == LAND_empty);
+      assert(DESC_LAND_TYPE(desc) == LAND_empty);
       break;
 
     /* Impossible cases. */

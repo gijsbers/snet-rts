@@ -300,7 +300,7 @@ void SNetNewStarLanding(snet_stream_desc_t *desc, snet_stream_desc_t *prev)
     /* Pop landing for this star incarnation */
     desc->landing = SNetPopLanding(prev);
     assert(desc->landing);
-    assert(desc->landing->type == LAND_star);
+    assert(DESC_LAND_TYPE(desc) == LAND_star);
     assert(DESC_NODE(desc) == DESC_DEST(desc));
     assert(desc->landing->refs > 1);
     SNetLandingDone(desc->landing);
@@ -379,14 +379,14 @@ void SNetNewDripBackLanding(snet_stream_desc_t *desc, snet_stream_desc_t *prev)
     desc->landing = SNetPopLanding(prev);
     assert(desc->landing);
     assert(DESC_NODE(desc) == DESC_DEST(desc));
-    assert(desc->landing->type == LAND_dripback2);
+    assert(DESC_LAND_TYPE(desc) == LAND_dripback2);
   }
   else if (DESC_STREAM(desc) == ndrip->selfref) {
     /* Retrieve dripback2 landing from the landing stack */
     desc->landing = SNetPopLanding(prev);
     assert(desc->landing);
     assert(DESC_NODE(desc) == DESC_DEST(desc));
-    assert(desc->landing->type == LAND_dripback2);
+    assert(DESC_LAND_TYPE(desc) == LAND_dripback2);
   }
   else {
     assert(0);
@@ -448,21 +448,21 @@ void SNetNewFeedbackLanding(snet_stream_desc_t *desc, snet_stream_desc_t *prev)
     desc->landing = SNetPopLanding(prev);
     assert(desc->landing);
     assert(DESC_NODE(desc) == DESC_DEST(desc));
-    assert(desc->landing->type == LAND_feedback3);
+    assert(DESC_LAND_TYPE(desc) == LAND_feedback3);
   }
   else if (DESC_STREAM(desc) == nfeed->selfref2) {
     /* Retrieve feedback2 landing from the landing stack */
     desc->landing = SNetPopLanding(prev);
     assert(desc->landing);
     assert(DESC_NODE(desc) == DESC_DEST(desc));
-    assert(desc->landing->type == LAND_feedback2);
+    assert(DESC_LAND_TYPE(desc) == LAND_feedback2);
   }
   else if (DESC_STREAM(desc) == nfeed->selfref4) {
     /* Retrieve feedback4 landing from the landing stack */
     desc->landing = SNetPopLanding(prev);
     assert(desc->landing);
     assert(DESC_NODE(desc) == DESC_DEST(desc));
-    assert(desc->landing->type == LAND_feedback4);
+    assert(DESC_LAND_TYPE(desc) == LAND_feedback4);
   }
   else {
     assert(0);

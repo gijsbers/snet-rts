@@ -50,7 +50,7 @@ void SNetTransferStop(void)
 {
   uint64_t key;
 
-  hello(__func__);
+  SNetDistribHello(__func__);
 
   LOCK(snet_continuations_lock);
 
@@ -219,7 +219,7 @@ void SNetNodeTransfer(snet_stream_desc_t *desc, snet_record_t *rec)
 /* Terminate a landing of type 'transfer'. */
 void SNetTermTransfer(landing_t *land, fifo_t *fifo)
 {
-  hello(__func__);
+  SNetDistribHello(__func__);
   assert(land->type == LAND_transfer);
   /* tell remote party to cleanup */
   SNetTransferDisconnect(LAND_SPEC(land, transfer)->connect);
@@ -236,7 +236,7 @@ snet_stream_desc_t *SNetTransferOpen(
 {
   landing_transfer_t    *transfer = DESC_LAND_SPEC(desc, transfer);
 
-  hello(__func__);
+  SNetDistribHello(__func__);
 
   /* Fill in the transfer landing specific details. */
   transfer->dest_loc = destination_location;
@@ -270,7 +270,7 @@ void SNetTransferReturn(
   landing_remote_t      *remote = LAND_SPEC(next, remote);
   landing_transfer_t    *transfer = DESC_LAND_SPEC(desc, transfer);
 
-  hello(__func__);
+  SNetDistribHello(__func__);
   SNetTransferOpen(remote->cont_loc, desc, prev);
 
   transfer->connect = SNetNew(connect_t);

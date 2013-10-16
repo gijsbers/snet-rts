@@ -20,6 +20,7 @@ typedef enum snet_comm {
   SNET_COMM_connect = 20,       /* setup a new cross-location stream */
   SNET_COMM_stop    = 30,       /* terminate remote input manager */
   SNET_COMM_record  = 40,       /* communicate a record */
+  SNET_COMM_hostname = 50,      /* communicate a node hostname */
 } snet_comm_t;
 
 /* The message structure which is constructed by SNetDistribReceiveMessage. */
@@ -32,10 +33,13 @@ typedef struct snet_mesg {
   snet_ref_t    *ref;           /* transmitted reference */
   uintptr_t      data;          /* transmitted data */
   int            val;           /* */
+  char          *hostname;      /* sender hostname */
 } snet_mesg_t;
 
 void SNetDistribReceiveMessage(snet_mesg_t *mesg);
 void SNetDistribTransmitConnect(connect_t *connect);
 void SNetDistribTransmitRecord(snet_record_t *rec, connect_t *connect);
+char* SNetDistribGetHostname(void);
+void SNetDistribTransmitHostname(void);
 
 #endif

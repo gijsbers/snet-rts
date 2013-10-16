@@ -38,6 +38,7 @@ int SNetDistribGetNodeId(void);
 bool SNetDistribIsNodeLocation(int location);
 bool SNetDistribIsRootNode(void);
 bool SNetDistribIsDistributed(void);
+int SNetDistribGetSize(void);
 
 void SNetDistribPack(void *src, ...);
 void SNetDistribUnpack(void *dst, ...);

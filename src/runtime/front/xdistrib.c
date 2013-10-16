@@ -7,7 +7,7 @@
 void SNetDistribLocalStop(void);
 void SNetDistribImplementationInit(int argc, char **argv, snet_info_t *info);
 
-void hello(const char *s)
+void SNetDistribHello(const char *s)
 {
   if (SNetDebugDF()) {
     printf("[%s.%d] hello\n", s, SNetDistribGetNodeId());
@@ -35,7 +35,7 @@ void SNetDistribStart(void)
 /* Cause dist layer to terminate. */
 void SNetDistribStop(void)
 {
-  hello(__func__);
+  SNetDistribHello(__func__);
 
   /* Tell lower layers to cleanup. */
   SNetDistribLocalStop();

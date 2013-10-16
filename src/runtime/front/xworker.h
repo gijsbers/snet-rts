@@ -42,6 +42,9 @@ typedef enum worker_role {
 
   /* Input manager processes incoming connections. */
   InputManager,
+
+  /* Load manager delegates excess work to remote resources. */
+  LoadManager,
 } worker_role_t;
 
 /* A work item represents a license to read from a descriptor. */
@@ -64,6 +67,9 @@ typedef struct work_item {
   /* A counter which refers to the value of the worker's turn value
    * at the moment of appending it to the list of free work items.*/
   size_t                 turn;
+
+  /* Tell whether the destination of descriptor 'desc' is a box landing. */
+  bool                   to_box;
 } work_item_t;
 
 /* A list of to-do work items. */
@@ -76,6 +82,9 @@ typedef struct work_list {
 typedef struct worker_lock {
   /* The worker ID of a visiting thief iff non-zero. */
   int                    id;
+
+  /* The number of records for box components stolen. */
+  int                    box_stolen;
 } worker_lock_t;
 
 /* A monotonically increasing counter for every thief visit and departure. */
@@ -172,6 +181,12 @@ struct worker {
 
   /* Whether the processor this worker is executing on has been revoked. */
   bool                   proc_revoked;
+
+  /* The number of records to be processed by box invocations. */
+  int                    box_records;
+
+  /* The number of streams which connect to box components. */
+  int                    box_streams;
 };
 
 

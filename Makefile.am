@@ -166,12 +166,14 @@ libfrontrt_la_SOURCES = \
 	src/runtime/front/node.c \
 	src/runtime/front/node.h \
 	src/runtime/front/node-proto.h \
+	src/runtime/front/pipemesg.h \
 	src/runtime/front/trace.c \
 	src/runtime/front/trace.h \
 	src/runtime/front/xbox.c \
 	src/runtime/front/xcoll.c \
 	src/runtime/front/xdet.c \
 	src/runtime/front/xdripback.c \
+	src/runtime/front/xdynres.c \
 	src/runtime/front/xfeedback.c \
 	src/runtime/front/xfifo.c \
 	src/runtime/front/xfifo.h \

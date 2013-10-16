@@ -48,6 +48,8 @@ typedef struct snet_entity_t snet_entity_t;
 typedef struct worker worker_t;
 typedef struct landing landing_t;
 typedef struct hash_ptab hash_ptab_t;
+typedef enum pipe_mesg_type pipe_mesg_type_t;
+typedef struct pipe_mesg pipe_mesg_t;
 
 #include "xworker.h"
 #include "detref.h"
@@ -556,6 +558,7 @@ struct snet_stream_desc_t {
   fifo_t                fifo;           /* a FIFO queue for records */
   int                   refs;           /* reference counter */
 };
+#define DESC_LAND_TYPE(desc)            ((desc)->landing->type)
 #define DESC_LAND_SPEC(desc,type)       LAND_SPEC((desc)->landing, type)
 #define DESC_NODE(desc)                 ((desc)->landing->node)
 #define DESC_NODE_SPEC(desc,type)       NODE_SPEC(DESC_NODE(desc), type)

@@ -59,6 +59,37 @@ void SNetDistribReceiveRecord(snet_mesg_t *mesg, mpi_buf_t *buf)
   mesg->rec = SNetRecDeserialise(buf, &SNetUnpackInt, &SNetUnpackRef);
 }
 
+void SNetDistribReceiveHostname(snet_mesg_t *mesg, mpi_buf_t *buf)
+{
+  char          from[MPI_MAX_PROCESSOR_NAME];
+
+  SNetUnpackByte(buf, MPI_MAX_PROCESSOR_NAME, from);
+  mesg->hostname = SNetStrDup(from);
+}
+
+char* SNetDistribGetHostname(void)
+{
+  int           len = 0;
+  char          host[MPI_MAX_PROCESSOR_NAME];
+  MPI_Get_processor_name(host, &len);
+  return SNetStrDup(host);
+}
+
+void SNetDistribTransmitHostname(void)
+{
+  int           len = 0;
+  char          host[MPI_MAX_PROCESSOR_NAME];
+  const size_t  max = 2*MPI_MAX_PROCESSOR_NAME;
+  mpi_buf_t     buf = {0, max, SNetMemAlloc(max)};
+
+  MPI_Get_processor_name(host, &len);
+  assert(len < sizeof host);
+  printf("Transmit hostname %14s for  node %d.\n", host, SNetDistribGetNodeId());
+  SNetPackByte(&buf, MPI_MAX_PROCESSOR_NAME, host);
+  SNetMPISend(buf.data, buf.offset, ROOT_LOCATION, SNET_COMM_hostname);
+  SNetMemFree(buf.data);
+}
+
 /* Accept an incoming message via MPI. */
 void SNetDistribReceiveMessage(snet_mesg_t *mesg)
 {
@@ -100,6 +131,10 @@ void SNetDistribReceiveMessage(snet_mesg_t *mesg)
 
     case SNET_COMM_record:
       SNetDistribReceiveRecord(mesg, &buf);
+      break;
+
+    case SNET_COMM_hostname:
+      SNetDistribReceiveHostname(mesg, &buf);
       break;
 
     case snet_ref_set:

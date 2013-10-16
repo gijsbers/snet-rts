@@ -3,7 +3,7 @@
 
 int node_location;
 
-void hello(const char *s)
+void SNetDistribHello(const char *s)
 {
   printf("%s called\n", s);
 }
@@ -25,7 +25,7 @@ void SNetDistribGlobalStop(void)
 
 void SNetDistribWaitExit(snet_info_t *info)
 {
-  hello(__func__);
+  SNetDistribHello(__func__);
 }
 
 /* Needed frequently for record IDs and field references. */
@@ -52,33 +52,30 @@ bool SNetDistribIsDistributed(void)
   return false;
 }
 
-/* void SNetDistribSendData(snet_ref_t *ref, void *data, int node)
-{
-  hello(__func__);
-} */
+int SNetDistribGetSize(void) { return 1; }
 
 /* Use by distribution layer in C4SNet.c. */
 void SNetDistribPack(void *src, ...)
 {
-  hello(__func__);
+  SNetDistribHello(__func__);
 }
 
 /* Use by distribution layer in C4SNet.c. */
 void SNetDistribUnpack(void *dst, ...)
 {
-  hello(__func__);
+  SNetDistribHello(__func__);
 }
 
 /* Request a field from transfer. Called when distributed. */
 void SNetDistribFetchRef(snet_ref_t *ref)
 {
-  hello(__func__);
+  SNetDistribHello(__func__);
 }
 
 /* Update field reference counter. Called when distributed. */
 void SNetDistribUpdateRef(snet_ref_t *ref, int count)
 {
-  hello(__func__);
+  SNetDistribHello(__func__);
 }
 
 /* Dummy function needed for networkinterface.c */

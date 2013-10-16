@@ -64,6 +64,12 @@ host_t* res_topo_get_host(int sysid)
   return NULL;
 }
 
+const char* res_topo_get_hostname(int sysid)
+{
+  host_t* host = res_topo_get_host(sysid);
+  return host ? host->hostname : NULL;
+}
+
 remt_t* res_topo_get_remt(void)
 {
   return &res_remt;

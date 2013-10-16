@@ -10,6 +10,7 @@ static void WorkerTodoInit(work_list_t *q)
   q->head.count = 0;
   q->head.lock = 0;
   q->head.turn = 0;
+  q->head.to_box = false;
 }
 
 /* Initialize a new free item list. */
@@ -51,6 +52,7 @@ worker_t *SNetWorkerCreate(
   }
   worker->steal_lock = SNetNewAlign(worker_lock_t);
   worker->steal_lock->id = 0;
+  worker->steal_lock->box_stolen = 0;
   worker->steal_turn = SNetNewAlign(worker_turn_t);
   worker->steal_turn->turn = 1;
 
@@ -65,6 +67,8 @@ worker_t *SNetWorkerCreate(
   worker->idle_seqnr = 0;
   worker->proc_bind = NO_PROC;
   worker->proc_revoked = false;
+  worker->box_records = 0;
+  worker->box_streams = 0;
 
   return worker;
 }
@@ -74,19 +78,24 @@ void SNetWorkerDestroy(worker_t *worker)
 {
   trace(__func__);
 
-  /* if (SNetVerbose()) {
-    if (worker->id == 1) {
-      printf("Created %u records\n", SNetGetRecCounter());
-    }
-  } */
+  // if (worker->id == 1) {
+  //     fprintf(stderr, "Created %u records\n", SNetGetRecCounter()); }
+
+  if (worker->box_records != worker->steal_lock->box_stolen || worker->box_streams) {
+    fprintf(stderr,
+            "Worker %2d has %d box records, %d box streams, %d box steals.\n",
+            worker->id, worker->box_records, worker->box_streams,
+            worker->steal_lock->box_stolen);
+  }
 
   /* Verify hash table is empty. */
   if (false == SNetHashPtrTabEmpty(worker->hash_ptab)) {
     snet_stream_desc_t *desc = SNetHashPtrFirst(worker->hash_ptab);
     do {
       work_item_t *item = SNetHashPtrLookup(worker->hash_ptab, desc);
-      fprintf(stderr, "%s(%d,%d) unprocessed item: desc %p, count %d, refs %d\n",
-              __func__, worker->id, worker->role, desc, item->count, desc->refs);
+      fprintf(stderr, "[%s.%d](%d,%d) unprocessed item: desc %p, count %d, refs %d\n",
+              __func__, SNetDistribGetNodeId(),
+              worker->id, worker->role, desc, item->count, desc->refs);
     } while ((desc = SNetHashPtrNext(worker->hash_ptab, desc)) != NULL);
   }
 
@@ -144,6 +153,7 @@ static work_item_t *GetFreeWorkItem(worker_t *worker)
   item->turn = 0;
   item->next_free = NULL;
   item->count = 0;
+  item->to_box = false;
   return item;
 }
 
@@ -175,6 +185,9 @@ void SNetWorkerTodo(worker_t *worker, snet_stream_desc_t *desc)
   if (item) {
     /* Item may be locked by a thief. */
     AAF(&item->count, 1);
+    if (item->to_box) {
+      worker->box_records += 1;
+    }
   } else {
     item = GetFreeWorkItem(worker);
     item->count = 1;
@@ -182,11 +195,16 @@ void SNetWorkerTodo(worker_t *worker, snet_stream_desc_t *desc)
     item->lock = 0;
     item->next_free = NULL;
     item->next_item = worker->prev->next_item;
+    item->to_box = (DESC_LAND_TYPE(desc) == LAND_box);
     BAR();
     worker->prev->next_item = item;
     worker->prev = item;
     SNetHashPtrStore(worker->hash_ptab, desc, item);
     worker->has_work = true;
+    if (item->to_box) {
+      worker->box_records += 1;
+      worker->box_streams += 1;
+    }
   }
 }
 
@@ -216,7 +234,7 @@ static bool SNetWorkerWorkItem(work_item_t *const item, worker_t *worker)
   }
 
   /* Bring item descriptors past any garbage collectable landings. */
-  while (item->desc->landing->type == LAND_garbage) {
+  while (DESC_LAND_TYPE(item->desc) == LAND_garbage) {
     /* Get subsequent descriptor. */
     snet_stream_desc_t *next_desc = DESC_LAND_SPEC(item->desc, siso)->outdesc;
 
@@ -233,7 +251,7 @@ static bool SNetWorkerWorkItem(work_item_t *const item, worker_t *worker)
     item->desc = next_desc;
 
     /* Also advance past subsequent garbage landings. */
-    while (next_desc->landing->type == LAND_garbage) {
+    while (DESC_LAND_TYPE(next_desc) == LAND_garbage) {
 
       /* Get subsequent descriptor. */
       item->desc = DESC_LAND_SPEC(next_desc, siso)->outdesc;
@@ -259,6 +277,11 @@ static bool SNetWorkerWorkItem(work_item_t *const item, worker_t *worker)
     if (lookup) {
       /* Merge the two counts. */
       AAF(&lookup->count, item->count);
+      /* Account for boxes. */
+      assert(item->to_box == lookup->to_box);
+      if (item->to_box) {
+        worker->box_records += item->count;
+      }
       /* Reset item. */
       item->count = 0;
       /* We already have this desciptor in lookup, so reset it. */
@@ -267,6 +290,12 @@ static bool SNetWorkerWorkItem(work_item_t *const item, worker_t *worker)
       return true;
     }
     else /* (lookup == NULL) */ {
+
+      /* Account for boxes. */
+      if (item->to_box) {
+        worker->box_records += item->count;
+        worker->box_streams += 1;
+      }
 
       /* Add new descriptor to hash table. */
       SNetHashPtrStore(worker->hash_ptab, item->desc, item);
@@ -281,6 +310,11 @@ static bool SNetWorkerWorkItem(work_item_t *const item, worker_t *worker)
 
   /* Subtract one read license. */
   --item->count;
+
+  /* Account for boxes. */
+  if (item->to_box) {
+    worker->box_records -= 1;
+  }
 
   /* Unlock item so thieves can steal it while we work. */
   unlock_work_item(item, worker);
@@ -347,7 +381,7 @@ static bool SNetWorkerWork(worker_t *worker)
     worker->iter = worker->prev->next_item;
 
     /* Traverse the to-do list until work is done. */
-    while (!didwork && worker->iter) {
+    while (worker->iter && (didwork == false || worker->iter->count == 0)) {
       work_item_t *item = worker->iter;
 
       /* Lock the work item */
@@ -361,6 +395,10 @@ static bool SNetWorkerWork(worker_t *worker)
         /* Remove empty items. */
         if (item->count == 0) {
           if (item->lock == worker->id || trylock_work_item(item, worker)) {
+            /* Account for streams to boxes. */
+            if (item->to_box) {
+              worker->box_streams -= 1;
+            }
             if (item->desc) {
               SNetHashPtrRemove(worker->hash_ptab, item->desc);
             }
@@ -379,6 +417,7 @@ static bool SNetWorkerWork(worker_t *worker)
       worker->iter = item->next_item;
     }
 
+    /* Processor may be rescheduled. */
     if (worker->proc_revoked) {
       assert(SNetOptResource());
       break;
@@ -402,10 +441,11 @@ void SNetWorkerStealVictim(worker_t *victim, worker_t *thief)
         work_item_t *lookup = (work_item_t *)
             SNetHashPtrLookup(thief->hash_ptab, item->desc);
         if (lookup) {
-          if (item->desc->landing->type == LAND_garbage) {
+          if (DESC_LAND_TYPE(item->desc) == LAND_garbage) {
             /* Take everything. */
             amount = item->count;
           } else {
+            assert(lookup->to_box == item->to_box);
             /* Split the work evenly. */
             amount = (item->count - lookup->count) / 2;
           }
@@ -420,7 +460,7 @@ void SNetWorkerStealVictim(worker_t *victim, worker_t *thief)
           thief->has_work = true;
         }
         else /* (lookup == NULL) */ {
-          if (item->desc->landing->type == LAND_garbage) {
+          if (DESC_LAND_TYPE(item->desc) == LAND_garbage) {
             /* Take everything. */
             amount = item->count;
           } else {
@@ -437,6 +477,9 @@ void SNetWorkerStealVictim(worker_t *victim, worker_t *thief)
         }
       }
       unlock_work_item(item, thief);
+      if (thief->loot.count > 0 && DESC_LAND_TYPE(thief->loot.desc) == LAND_box) {
+        FAA(&victim->steal_lock->box_stolen, thief->loot.count);
+      }
     }
   }
   if (thief->loot.desc && SNetDebugWS()) {
@@ -475,6 +518,9 @@ static void SNetWorkerLoot(worker_t *worker)
     if (worker->loot.item) {
       if (worker->loot.count > 0) {
         AAF(&(worker->loot.item->count), worker->loot.count);
+        if (worker->loot.item->to_box) {
+          worker->box_records += worker->loot.count;
+        }
       }
       if (trylock_work_item(worker->loot.item, worker)) {
         if (worker->loot.item->count > 0) {
@@ -492,9 +538,17 @@ static void SNetWorkerLoot(worker_t *worker)
       item->desc = worker->loot.desc;
       item->lock = worker->id;
       item->count = worker->loot.count;
+      item->to_box = (DESC_LAND_TYPE(item->desc) == LAND_box);
       SNetHashPtrStore(worker->hash_ptab, item->desc, item);
+      if (item->to_box) {
+        worker->box_records += item->count;
+        worker->box_streams += 1;
+      }
       SNetWorkerWorkItem(item, worker);
       if (item->count == 0) {
+        if (item->to_box) {
+          worker->box_streams -= 1;
+        }
         if (item->desc) {
           SNetHashPtrRemove(worker->hash_ptab, item->desc);
         }
@@ -591,6 +645,10 @@ void SNetWorkerMaintenaince(worker_t *worker)
       /* Lock the work item */
       if (trylock_work_item(item, worker)) {
 
+        if (item->to_box) {
+          worker->box_streams -= 1;
+        }
+
         /* Remove item from hash table. */
         if (item->desc) {
           SNetHashPtrRemove(worker->hash_ptab, item->desc);
@@ -624,7 +682,7 @@ void SNetWorkerWait(worker_t *worker)
 {
   while (SNetWorkerOthersBusy(worker)) {
     SNetWorkerMaintenaince(worker);
-    usleep(1000);
+    usleep(10*1000);
   }
 }
 

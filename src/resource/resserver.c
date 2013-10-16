@@ -29,6 +29,11 @@ int res_server_get_granted(server_t* server)
   return server->granted - server->revoked;
 }
 
+void res_server_get_systems_mask(server_t* server, bitmap_t* mask)
+{
+  *mask = server->systems;
+}
+
 void res_server_get_revoke_mask(server_t* server, bitmap_t* mask)
 {
   *mask = server->revokemask;
@@ -133,6 +138,16 @@ static void res_server_number(server_t* server, int* number)
   res_parse_expect(&server->stream, expect, number);
 }
 
+void res_server_access(server_t* server, int sysid)
+{
+  assert(sysid >= 0 && sysid < NUM_BITS);
+  if (NOT(server->access, sysid)) {
+    res_debug("Send access %d\n", sysid);
+    res_server_reply(server, "{ access %d }", sysid);
+    SET(server->access, sysid);
+  }
+}
+
 static void res_server_command_systems(server_t* server)
 {
   intlist_t* ints = res_parse_intlist(&server->stream);
@@ -144,27 +159,26 @@ static void res_server_command_systems(server_t* server)
     if (val < 0 || val >= NUM_BITS) {
       res_list_destroy(ints);
       res_parse_throw();
-    } else {
-      SET(server->systems, val);
+    }
+    else if (NOT(server->systems, val)) {
+      // SET(server->systems, val);
+      res_debug("Send topology %d\n", val);
+      res_server_reply(server, "{ topology %d }", val);
+      if (val == 0) {
+        res_server_access(server, val);
+        res_server_change_state(server, ServerListSent, ServerTopoSent);
+      }
+    }
+    else {
+      res_warn("Duplicate systems announcement for system %d.\n", val);
     }
   }
   res_list_destroy(ints);
 
-  res_server_change_state(server, ServerListSent, ServerListRcvd);
-
-  if (NOT(server->systems, 0)) {
+  if (NOT(server->access, 0)) {
     res_warn("[%s]: Received systems has no local!\n", __func__);
     res_parse_throw();
   }
-
-  SET(server->access, 0);
-
-  res_debug("Send access 0\n");
-  res_server_reply(server, "%s", "{ access 0 }");
-  res_debug("Send topology 0\n");
-  res_server_reply(server, "%s", "{ topology 0 }");
-
-  res_server_change_state(server, ServerListRcvd, ServerTopoSent);
 }
 
 static void res_server_command_system(server_t* server)
@@ -173,10 +187,18 @@ static void res_server_command_system(server_t* server)
 
   res_parse_system(&server->stream, &host);
 
-  assert(host->index == 0);
-  res_topo_add_host(host);
+  if (HAS(server->systems, host->index)) {
+    res_warn("Receiving duplicate topology for host %d %s\n", host->index, host->hostname);
+  } else {
 
-  res_server_change_state(server, ServerTopoSent, ServerTopoRcvd);
+    res_debug("Adding topo for host %d %s.\n", host->index, host->hostname);
+    res_topo_add_host(host);
+
+    SET(server->systems, host->index);
+    if (host->index == 0) {
+      res_server_change_state(server, ServerTopoSent, ServerTopoRcvd);
+    }
+  }
 }
 
 static void res_server_command_grant(server_t* server)

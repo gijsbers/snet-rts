@@ -19,8 +19,14 @@ typedef struct connect_state {
 
 static node_t            input_manager_node;
 static snet_hashtable_t *connections;
+static char            **node_names;
+static int               node_name_count;
+static int               node_name_size;
+static lock_t            node_name_lock;
+static lock_t            node_done_lock;
+static bool              node_done_inited;
 
-void hello(const char *s);
+extern void SNetDistribHello(const char *s);
 
 /* Setup data structures for input manager. */
 void SNetInputManagerInit(void)
@@ -44,6 +50,25 @@ void SNetInputManagerInit(void)
 
   /* Create a hashtable to store state for incoming connections. */
   connections = SNetHashtableCreate(0);
+
+  /* Initialize locks to protect integrity of node names. */
+  LOCK_INIT(node_name_lock);
+  LOCK_INIT2(node_done_lock, 0);
+
+  /* Setup a table of node hostnames which is to be filled in as we go. */
+  node_name_size = SNetDistribGetSize();
+  assert(node_name_size > 0);
+  node_names = SNetNewN(node_name_size, char*);
+  for (int i = 0; i < node_name_size; ++i) {
+    node_names[i] = NULL;
+  }
+  node_names[0] = SNetDistribGetHostname();
+  node_name_count = 1;
+  node_done_inited = false;
+  if (node_name_count == node_name_size) {
+    UNLOCK(node_done_lock);
+    node_done_inited = true;
+  }
 }
 
 /* Start input manager thread. */
@@ -58,6 +83,9 @@ void SNetInputManagerStart(void)
   if (!trylock_landing(iarg->indesc->landing, worker)) {
     assert(false);
   }
+  if (SNetDistribGetNodeId() > ROOT_LOCATION) {
+    SNetDistribTransmitHostname();
+  }
 }
 
 /* Cleanup input manager. */
@@ -66,7 +94,7 @@ void SNetInputManagerStop(void)
   imanager_arg_t        *iarg = NODE_SPEC(&input_manager_node, imanager);
   uint64_t               key;
 
-  hello(__func__);
+  SNetDistribHello(__func__);
 
   iarg->indesc->landing->refs = 0;
   SNetFreeLanding(iarg->indesc->landing);
@@ -81,25 +109,41 @@ void SNetInputManagerStop(void)
     /* We describe each unfreed connection in detail. */
     do {
       connect_state_t *cs = SNetHashtableGet(connections, key);
-      printf("[%s.%d]: unfreed connection: \n"
-             "\tfrom %d.%d to %d.%d, cont %d.%d, split %d.%d,\n"
-             "\tstream %s to %s, refs %d, landing %s %s, refs %d\n", 
-             __func__, SNetDistribGetNodeId(),
-             cs->connect->source_loc, cs->connect->source_conn,
-             cs->connect->dest_loc, cs->connect->table_index,
-             cs->connect->cont_loc, cs->connect->cont_num,
-             cs->connect->split_level, cs->connect->dyn_loc,
-             SNetNodeName(cs->desc->stream->from),
-             SNetNodeName(cs->desc->stream->dest),
-             cs->desc->refs,
-             SNetLandingName(cs->desc->landing),
-             (cs->desc->landing->type == LAND_box) ?
-             LAND_NODE_SPEC(cs->desc->landing, box)->boxname :
-             "", cs->desc->landing->refs);
+      fprintf(stderr, "[%s.%d]: unfreed connection: \n"
+              "\tfrom %d.%d to %d.%d, cont %d.%d, split %d.%d,\n"
+              "\tstream %s to %s, refs %d, landing %s %s, refs %d\n", 
+              __func__, SNetDistribGetNodeId(),
+              cs->connect->source_loc, cs->connect->source_conn,
+              cs->connect->dest_loc, cs->connect->table_index,
+              cs->connect->cont_loc, cs->connect->cont_num,
+              cs->connect->split_level, cs->connect->dyn_loc,
+              SNetNodeName(cs->desc->stream->from),
+              SNetNodeName(cs->desc->stream->dest),
+              cs->desc->refs,
+              SNetLandingName(cs->desc->landing),
+              (DESC_LAND_TYPE(cs->desc) == LAND_box) ?
+              LAND_NODE_SPEC(cs->desc->landing, box)->boxname :
+              "", cs->desc->landing->refs);
     } while (SNetHashtableNextKey(connections, key, &key));
   }
 
   SNetHashtableDestroy(connections);
+
+  /* Free all node names. */
+  LOCK(node_name_lock);
+  for (int i = 0; i < node_name_size; ++i) {
+    if (node_names[i]) {
+      SNetMemFree(node_names[i]);
+      node_names[i] = NULL;
+    }
+  }
+  SNetMemFree(node_names);
+  node_names = NULL;
+  node_name_size = 0;
+  node_name_count = 0;
+  node_done_inited = false;
+  LOCK_DESTROY(node_name_lock);
+  LOCK_DESTROY(node_done_lock);
 }
 
 /* Open a new stream for an incoming connection. */
@@ -235,6 +279,87 @@ static void SNetInputManagerForwardRecord(snet_mesg_t *mesg)
   }
 }
 
+/* Accept a new node hostname. */
+static void SNetInputManagerReceiveHostname(snet_mesg_t *mesg)
+{
+  printf("Receive  hostname %14s from node %d.\n", mesg->hostname, mesg->source);
+  assert(SNetDistribGetNodeId() == 0);
+  assert(mesg->source >= 1);
+
+  LOCK(node_name_lock);
+  if (mesg->source >= node_name_size) {
+    node_names = SNetMemResize(node_names, (mesg->source + 1) * sizeof(char *));
+    while (node_name_size < mesg->source + 1) {
+      node_names[node_name_size++] = NULL;
+    }
+  }
+  assert(node_names[mesg->source] == NULL);
+  node_names[mesg->source] = mesg->hostname;
+  node_name_count += 1;
+  mesg->hostname = NULL;
+  UNLOCK(node_name_lock);
+
+  if (node_done_inited == false && node_name_count == SNetDistribGetSize()) {
+    UNLOCK(node_done_lock);
+    node_done_inited = true;
+  }
+}
+
+/* Retrieve a reference to a node hostname. */
+char* SNetInputManagerGetHostname(int node)
+{
+  char* name = NULL;
+
+  printf("%s for node %d.\n", __func__, node);
+  assert(node >= 0);
+  for (int tries = 0; tries < 2 && name == NULL; ++tries) {
+    if (tries == 1) {
+      printf("%s lock done...\n", __func__);
+      LOCK(node_done_lock);
+    }
+    printf("%s locking...\n", __func__);
+    LOCK(node_name_lock);
+    name = node_names[node];
+    printf("%s unlocking.\n", __func__);
+    UNLOCK(node_name_lock);
+    if (tries == 1) {
+      printf("%s unlock done.\n", __func__);
+      UNLOCK(node_done_lock);
+    }
+  }
+  return name;
+}
+
+/* Find out if we have access to a named node. */
+bool SNetInputManagerGetNode(const char* host, int* node)
+{
+  bool found = false;
+
+  printf("%s for host %s.\n", __func__, host);
+  for (int tries = 0; tries < 2 && found == false; ++tries) {
+    if (tries == 1) {
+      printf("%s lock done...\n", __func__);
+      LOCK(node_done_lock);
+    }
+    printf("%s locking...\n", __func__);
+    LOCK(node_name_lock);
+    for (int i = 0; i < node_name_size; ++i) {
+      if (node_names[i] && !strcmp(host, node_names[i])) {
+        *node = i;
+        found = true;
+        break;
+      }
+    }
+    printf("%s unlocking.\n", __func__);
+    UNLOCK(node_name_lock);
+    if (tries == 1) {
+      printf("%s unlock done.\n", __func__);
+      UNLOCK(node_done_lock);
+    }
+  }
+  return found;
+}
+
 /* Process one input message. */
 bool SNetInputManagerDoTask(worker_t *worker)
 {
@@ -256,6 +381,10 @@ bool SNetInputManagerDoTask(worker_t *worker)
 
     case SNET_COMM_record:
       SNetInputManagerForwardRecord(&mesg);
+      break;
+
+    case SNET_COMM_hostname:
+      SNetInputManagerReceiveHostname(&mesg);
       break;
 
     case snet_ref_set:
