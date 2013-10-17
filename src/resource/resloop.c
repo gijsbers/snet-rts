@@ -121,21 +121,14 @@ void res_loop(int listen)
       }
     }
 
-    if (rebalance_local) {
-      res_rebalance_local(client_map);
-      for (sock = 1 + listen; sock <= max_sock; ++sock) {
-        if (FD_ISSET(sock, &rset)) {
-          client_t* client = res_map_get(sock_map, sock);
-          if (res_client_writing(client)) {
-            FD_SET(sock, &wset);
-            FD_CLR(sock, &rset);
-            ++wcnt;
-          }
-        }
+    if (rebalance_local || rebalance_remote) {
+      if (rebalance_local) {
+        res_rebalance_local(client_map);
       }
-    }
-    if (rebalance_remote) {
-      res_rebalance_remote(client_map);
+      printf("rebalance_remote = %#lx\n", rebalance_remote);
+      if (rebalance_remote) {
+        res_rebalance_remote(client_map);
+      }
       for (sock = 1 + listen; sock <= max_sock; ++sock) {
         if (FD_ISSET(sock, &rset)) {
           client_t* client = res_map_get(sock_map, sock);

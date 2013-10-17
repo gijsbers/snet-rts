@@ -44,6 +44,11 @@ int res_server_get_local(server_t* server)
   return server->local;
 }
 
+int res_server_get_remote(server_t* server)
+{
+  return server->remote;
+}
+
 int res_server_allocate_proc(server_t* server)
 {
   bitmap_t availmask = BITMAP_AND(server->grantmask, BITMAP_NOT(

@@ -255,12 +255,17 @@ void SNetMasterResource(worker_config_t* config, int recv)
     if (remotes > 0) {
       const double now = SNetRealTime();
       if (load_check_time <= now) {
+        /* Number of box read-licenses in the system. */
         size_t total_boxes = 0;
+        /* Number of already completed box invocations. */
         size_t total_done = 0;
+        /* Collect global box statistics. */
         for (int i = 1; i <= worker_count; ++i) {
           worker_t* worker = config->workers[i];
           if (worker != NULL) {
             int boxes = worker->box_records - worker->steal_lock->box_stolen;
+            printf("worker %d, box records %d, box stolen %d, boxes now %d\n",
+                    i, worker->box_records, worker->steal_lock->box_stolen, boxes);
             if (boxes > 0) {
               total_boxes += boxes;
             }
@@ -269,26 +274,40 @@ void SNetMasterResource(worker_config_t* config, int recv)
         }
         if (load_check_time > prev_check_time) {
           if (total_done >= boxes_completed) {
+            /* Number of completed box invocations as compared to last time. */
             size_t work = total_done - boxes_completed;
             double period = now - prev_check_time;
             const double mixin = 0.25;
             const double keep = 1.0 - mixin;
+            /* Update box processing rate. */
             box_rate = keep * box_rate + mixin * (work / period);
+            printf("total_done %zd, boxes_completed %zd, work %zd\n",
+                   total_done, boxes_completed, work);
+            printf("total_boxes %zd, period %f, box_rate = %f\n",
+                   total_boxes, period, box_rate);
 
-            int threads = MIN(1, started - idlers);
-            double proc_load = total_boxes / (box_rate * threads);
-            int excess = (int)(proc_load - granted);
-            if (excess >= 0) {
-              res_server_set_remote(server, excess);
-            }
+            /* Compute an estimate for the total number of processors we could use. */
+            int threads = MAX(1, started - idlers);
+            /* Load is amount of available work divided by processing power. */
+            double proc_load = threads * total_boxes / box_rate;
+            /* Guesstimate the number of external processors we can keep busy. */
+            int excess = MAX(0, (int)(proc_load - granted));
+            printf("excess = %d, proc_load = %f, threads %d, boxes %zd, granted = %d\n",
+                    excess, proc_load, threads, total_boxes, granted);
+            res_server_set_remote(server, excess);
           }
         } else {
+          /* First measurement: only collect data, no external load computations. */
           double period = now - begin;
           box_rate = 1.0 + total_done / period;
         }
+
+        /* Remember number of completed box invocations. */
         boxes_completed = total_done;
+        /* Compute time of next load check event. */
+        prev_check_time = now;
+        load_check_time = now + load_check_period;
       }
-      load_check_time = now + load_check_period;
     }
   }
 
