@@ -41,6 +41,10 @@ struct server {
 
   /* Bitmask of revoked processors. */
   bitmap_t      revokemask;
+
+  /* Current remote workload. */
+  int           remote;
+
 };
 
 #endif

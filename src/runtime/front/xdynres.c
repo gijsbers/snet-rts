@@ -28,6 +28,7 @@ void SNetMasterResource(worker_config_t* config, int recv)
 {
 #if ENABLE_RESSERV
   const int     worker_limit = config->worker_count;
+  const int     data_worker_limit = worker_limit - SNetThreadedManagers();
   int           worker_count = 0, remotes = 0;
   int           i, started = 0, wanted = 1, idlers = 0, granted = 0, managed = 0;
   pipe_mesg_t   mesg;
@@ -35,7 +36,9 @@ void SNetMasterResource(worker_config_t* config, int recv)
   int          *procs = SNetMemCalloc(2 + worker_limit, sizeof(*procs));
   enum state { SlaveDone, SlaveIdle, SlaveBusy };
   const double  begin = SNetRealTime(), load_check_period = 0.1;
-  double        endtime = 0, loadtime = 0;
+  double        endtime = 0, load_check_time = 0, prev_check_time = 0;
+  double        box_rate = 0;
+  size_t        boxes_completed = 0;
   server_t     *server;
   bitmap_t      revokes = BITMAP_ZERO;
   bitmap_t      hostmap = BITMAP_ZERO;
@@ -60,7 +63,7 @@ void SNetMasterResource(worker_config_t* config, int recv)
   }
 
   /* Check for management workers which have already started. */
-  for (i = 0; i <= worker_limit; ++i) {
+  for (i = 1; i <= worker_limit; ++i) {
     if (config->workers[i]) {
       assert(config->workers[i]->id == i);
       assert(config->workers[i]->role == InputManager);
@@ -136,7 +139,7 @@ void SNetMasterResource(worker_config_t* config, int recv)
                 res_server_access(server, i);
                 ++remotes;
                 if (remotes == 1) {
-                  loadtime = SNetRealTime();
+                  load_check_time = prev_check_time = SNetRealTime();
                 }
               } else {
                 printf("System %s unknown.\n", name);
@@ -156,7 +159,7 @@ void SNetMasterResource(worker_config_t* config, int recv)
         do {
           int proc = res_server_allocate_proc(server);
           for (i = 1; state[i]; ++i) {}
-          assert(i <= worker_limit);
+          assert(i <= data_worker_limit);
           SNetMasterStartOne(i, config, proc);
           state[i] = SlaveIdle;
           procs[i] = proc;
@@ -169,7 +172,7 @@ void SNetMasterResource(worker_config_t* config, int recv)
       double wait = WAIT_FOREVER;
       if (remotes > 0) {
         const double now = SNetRealTime();
-        wait = (loadtime > now) ? (loadtime - now) : 0;
+        wait = (load_check_time > now) ? (load_check_time - now) : 0;
       }
       input = SNetWaitForInput(recv, sock, wait);
       assert(input >= 0 && input <= 3);
@@ -238,7 +241,7 @@ void SNetMasterResource(worker_config_t* config, int recv)
           }
           assert(state[mesg.id] == SlaveIdle);
           state[mesg.id] = SlaveBusy;
-          if (started < worker_limit && started == wanted && idlers == 0) {
+          if (started < data_worker_limit && started == wanted && idlers == 0) {
             ++wanted;
           }
           endtime = SNetRealTime();
@@ -248,11 +251,44 @@ void SNetMasterResource(worker_config_t* config, int recv)
       }
     }
 
+    /* Check if we should offload work to remote nodes. */
     if (remotes > 0) {
       const double now = SNetRealTime();
-      if (now >= loadtime) {
-        loadtime = now + load_check_period;
+      if (load_check_time <= now) {
+        size_t total_boxes = 0;
+        size_t total_done = 0;
+        for (int i = 1; i <= worker_count; ++i) {
+          worker_t* worker = config->workers[i];
+          if (worker != NULL) {
+            int boxes = worker->box_records - worker->steal_lock->box_stolen;
+            if (boxes > 0) {
+              total_boxes += boxes;
+            }
+            total_done += worker->box_done;
+          }
+        }
+        if (load_check_time > prev_check_time) {
+          if (total_done >= boxes_completed) {
+            size_t work = total_done - boxes_completed;
+            double period = now - prev_check_time;
+            const double mixin = 0.25;
+            const double keep = 1.0 - mixin;
+            box_rate = keep * box_rate + mixin * (work / period);
+
+            int threads = MIN(1, started - idlers);
+            double proc_load = total_boxes / (box_rate * threads);
+            int excess = (int)(proc_load - granted);
+            if (excess >= 0) {
+              res_server_set_remote(server, excess);
+            }
+          }
+        } else {
+          double period = now - begin;
+          box_rate = 1.0 + total_done / period;
+        }
+        boxes_completed = total_done;
       }
+      load_check_time = now + load_check_period;
     }
   }
 

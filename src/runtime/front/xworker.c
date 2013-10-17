@@ -69,6 +69,7 @@ worker_t *SNetWorkerCreate(
   worker->proc_revoked = false;
   worker->box_records = 0;
   worker->box_streams = 0;
+  worker->box_done = 0;
 
   return worker;
 }
@@ -314,6 +315,7 @@ static bool SNetWorkerWorkItem(work_item_t *const item, worker_t *worker)
   /* Account for boxes. */
   if (item->to_box) {
     worker->box_records -= 1;
+    worker->box_done += 1;
   }
 
   /* Unlock item so thieves can steal it while we work. */

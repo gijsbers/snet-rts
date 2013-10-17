@@ -127,6 +127,16 @@ void res_server_set_local(server_t* server, int local)
   }
 }
 
+void res_server_set_remote(server_t* server, int remote)
+{
+  if (server->remote != remote && remote >= 0) {
+    server->remote = remote;
+    res_debug("Send remote %d\n", server->remote);
+    res_server_reply(server, "{ remote %d }", server->remote);
+    res_server_flush(server);
+  }
+}
+
 static void res_server_expect(server_t* server, token_t expect)
 {
   res_parse_expect(&server->stream, expect, NULL);

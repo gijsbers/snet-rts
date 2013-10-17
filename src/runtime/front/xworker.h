@@ -187,6 +187,9 @@ struct worker {
 
   /* The number of streams which connect to box components. */
   int                    box_streams;
+
+  /* The number of invoked box components. */
+  size_t                 box_done;
 };
 
 

@@ -212,6 +212,7 @@ int res_server_get_local(server_t* server);
 int res_server_allocate_proc(server_t* server);
 void res_server_release_proc(server_t* server, int proc);
 void res_server_set_local(server_t* server, int local);
+void res_server_set_remote(server_t* server, int remote);
 void res_server_access(server_t* server, int sysid);
 int res_server_flush(server_t* server);
 int res_server_read(server_t* server);
